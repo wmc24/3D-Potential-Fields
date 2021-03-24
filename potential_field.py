@@ -8,9 +8,23 @@ import numpy as np
 
 
 def get_velocity_to_reach_goal(position, goal_position, dims):
-  v = np.zeros(dims, dtype=np.float32)
   # MISSING: Compute the velocity field needed to reach goal_position
   # assuming that there are no obstacles.
+  
+  cruising_speed = 0.5
+  convergence_radius = 1
+  
+  # Getting the distance to the goal
+  dist = np.sqrt(np.sum((position - goal_position)**2))
+  
+  # Getting the direction to the goal
+  direction = normalise(goal_position - position)
+  
+  # Applying a potential inspired by Huber Loss
+  if dist < convergence_radius:
+    v = cruising_speed * dist * direction / convergence_radius
+  else:
+    v = cruising_speed * direction
 
   return v
 
