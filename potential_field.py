@@ -18,7 +18,7 @@ def get_velocity_to_reach_goal(position, goal_position, dims):
   dist = np.sqrt(np.sum((position - goal_position)**2))
   
   # Getting the direction to the goal
-  direction = normalise(goal_position - position)
+  direction = normalize(goal_position - position)
   
   # Applying a potential inspired by Huber Loss
   if dist < convergence_radius:
@@ -113,8 +113,8 @@ PLANET_POSITION = np.array([3., 2., .5][:DIMENSIONS], dtype=np.float32)
 PLANET_RADIUS = .3
 STATIONARY_SPACESHIP = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  normalize(np.array([.3, -4.], dtype=np.float32))))
 METEOROID = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  MAX_SPEED * 2 * normalize(np.array([.3, -4.], dtype=np.float32))))
-GOAL_POSITION = np.array([5., 5.], dtype=np.float32)
-START_POSITION = np.array([-5., -5.], dtype=np.float32)
+GOAL_POSITION = np.array([2.5, 2.5], dtype=np.float32)
+START_POSITION = np.array([-2.5, -2.5], dtype=np.float32)
 
 
 if __name__ == '__main__':
