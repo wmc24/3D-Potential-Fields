@@ -7,18 +7,6 @@ import matplotlib.pylab as plt
 import numpy as np
 
 
-# Default Arena
-DIMENSIONS = 2
-MAX_SPEED = .5
-SIZE_OF_UNIVERSE = 10.
-PLANET_POSITION = np.array([3., 2., .5][:DIMENSIONS], dtype=np.float32)
-PLANET_RADIUS = .3
-STATIONARY_SPACESHIP = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  normalize(np.array([.3, -4.], dtype=np.float32))))
-METEOROID = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  MAX_SPEED * 2 * normalize(np.array([.3, -4.], dtype=np.float32))))
-GOAL_POSITION = np.array([5., 5.], dtype=np.float32)
-START_POSITION = np.array([-5., -5.], dtype=np.float32)
-
-
 def get_velocity_to_reach_goal(position, goal_position, dims):
   v = np.zeros(dims, dtype=np.float32)
   # MISSING: Compute the velocity field needed to reach goal_position
@@ -103,6 +91,18 @@ def get_velocity(position, mode='all'):
   return cap(v, max_speed=MAX_SPEED)
 
 
+# Default Arena
+DIMENSIONS = 2
+MAX_SPEED = .5
+SIZE_OF_UNIVERSE = 10.
+PLANET_POSITION = np.array([3., 2., .5][:DIMENSIONS], dtype=np.float32)
+PLANET_RADIUS = .3
+STATIONARY_SPACESHIP = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  normalize(np.array([.3, -4.], dtype=np.float32))))
+METEOROID = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  MAX_SPEED * 2 * normalize(np.array([.3, -4.], dtype=np.float32))))
+GOAL_POSITION = np.array([5., 5.], dtype=np.float32)
+START_POSITION = np.array([-5., -5.], dtype=np.float32)
+
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Runs obstacle avoidance with a potential field')
   parser.add_argument('--mode', action='store', default='all', help='Which velocity field to plot.', choices=['planet', 'spaceship', 'meteoroid', 'goal', 'all'])
@@ -133,14 +133,14 @@ if __name__ == '__main__':
   # Also perform Euler integration of the meteoroid
   dt = 0.01
   x = START_POSITION
-  x_meteoroid = METEOROID_POSITION[:DIMENSION]
+  x_meteoroid = METEOROID[:DIMENSIONS]
   positions = [x]
   positions_meteoroid = [x_meteoroid]
   for t in np.arange(0., 20., dt):
     v = get_velocity(x, args.mode)
     x = x + v * dt
     positions.append(x)
-    v = METEOROID_POSITION[DIMENSION:]
+    v = METEOROID[DIMENSIONS:]
     x_meteoroid = x_meteoroid + v * dt
     positions_meteoroid.append(x_meteoroid)
   positions = np.array(positions)
