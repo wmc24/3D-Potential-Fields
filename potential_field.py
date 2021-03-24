@@ -7,13 +7,10 @@ import matplotlib.pylab as plt
 import numpy as np
 
 
-def get_velocity_to_reach_goal(position, goal_position, dims):
+def get_velocity_to_reach_goal(position, goal_position, dims, cruising_speed = 0.5, convergence_radius = 1):
   # MISSING: Compute the velocity field needed to reach goal_position
   # assuming that there are no obstacles.
-  
-  cruising_speed = 0.5
-  convergence_radius = 1
-  
+
   # Getting the distance to the goal
   dist = np.sqrt(np.sum((position - goal_position)**2))
   
@@ -53,18 +50,19 @@ def get_velocity_to_avoid_spaceships(position, spaceship_positions, dims):
   return v
 
 
-def get_velocity_to_avoid_meteoroids(position, meteoroids_positions, dims):
+def get_velocity_to_avoid_meteoroids(position, meteoroids, dims):
   v = np.zeros(dims, dtype=np.float32)
   # MISSING: Compute the velocity field needed to avoid other spaceships
   # In the worst case there might a large force pushing towards the
   # obstacles (consider what is the largest force resulting from the
   # get_velocity_to_reach_goal function). 
   
-  # The meteroid positions are a list consisting of cartesian coordinates and
+  # The meteroid are a list consisting of cartesian coordinates and
   # a veclocity vector
 
   return v
 
+# SHOULD WE ADD A NOISE POTENTIAL????
 
 def normalize(v):
   n = np.linalg.norm(v)
@@ -80,29 +78,39 @@ def cap(v, max_speed):
   return v
 
 
-def get_velocity(position, mode='all'):
+def get_velocity(position, goal_position, planet_positions, planet_radii, other_spaceships, meteoroids, dims, max_speed, mode='all'):
   if mode in ('goal', 'all'):
-    v_goal = get_velocity_to_reach_goal(position, GOAL_POSITION, DIMENSIONS)
+    v_goal = get_velocity_to_reach_goal(position, goal_position, dims)
   else:
-    v_goal = np.zeros(DIMENSIONS, dtype=np.float32)
+    v_goal = np.zeros(dims, dtype=np.float32)
 
   if mode in ('planet', 'all'):
-    v_planets = get_velocity_to_avoid_planets(position, [PLANET_POSITION], [PLANET_RADIUS], DIMENSIONS)
+    v_planets = get_velocity_to_avoid_planets(position, planet_positions, planet_radii, dims)
   else:
-    v_planets = np.zeros(DIMENSIONS, dtype=np.float32)
+    v_planets = np.zeros(dims, dtype=np.float32)
     
   if mode in ('spaceship', 'all'):
-    v_spaceships = get_velocity_to_avoid_spaceships(position, [STATIONARY_SPACESHIP], DIMENSIONS)
+    v_spaceships = get_velocity_to_avoid_spaceships(position, other_spaceships, dims)
   else:
-    v_spaceships = np.zeros(DIMENSIONS, dtype=np.float32)
+    v_spaceships = np.zeros(dims, dtype=np.float32)
     
   if mode in ('meteoroid', 'all'):
-    v_meteoroids = get_velocity_to_avoid_meteoroids(position, [METEOROID], DIMENSIONS)
+    v_meteoroids = get_velocity_to_avoid_meteoroids(position, meteoroids, dims)
   else:
-    v_meteoroids = np.zeros(DIMENSIONS, dtype=np.float32)
+    v_meteoroids = np.zeros(dims, dtype=np.float32)
     
   v = v_goal + v_planets + v_spaceships + v_meteoroids
-  return cap(v, max_speed=MAX_SPEED)
+  return cap(v, max_speed=max_speed)
+
+
+def spaceships_update_pose(spaceships, goal_positions, meteoroids, planet_positions, planet_radii, dims, dt):
+  # MISSING: Need to compute the updated pose of all the spaceships
+  # passed through the list spaceships
+
+  # all the passed variables are defined the same was as in the potential fields/ velocity fields
+  # dt is the timestep for the update.
+
+  return spaceships
 
 
 # Default Arena
@@ -130,7 +138,7 @@ if __name__ == '__main__':
   V = np.zeros_like(X)
   for i in range(len(X)):
     for j in range(len(X[0])):
-      velocity = get_velocity(np.array([X[i, j], Y[i, j]]), args.mode)
+      velocity = get_velocity(np.array([X[i, j], Y[i, j]]), GOAL_POSITION, [PLANET_POSITION], [PLANET_RADIUS], [STATIONARY_SPACESHIP], [METEOROID], DIMENSIONS, MAX_SPEED, mode='all')
       U[i, j] = velocity[0]
       V[i, j] = velocity[1]
   plt.quiver(X, Y, U, V, units='width')
@@ -151,7 +159,7 @@ if __name__ == '__main__':
   positions = [x]
   positions_meteoroid = [x_meteoroid]
   for t in np.arange(0., 20., dt):
-    v = get_velocity(x, args.mode)
+    v = get_velocity(x, GOAL_POSITION, [PLANET_POSITION], [PLANET_RADIUS], [STATIONARY_SPACESHIP], [METEOROID], DIMENSIONS, MAX_SPEED, mode='all')
     x = x + v * dt
     positions.append(x)
     v = METEOROID[DIMENSIONS:]
