@@ -107,12 +107,16 @@ def get_velocity(position, goal_position, planet_positions, planet_radii, other_
   return cap(v, max_speed=max_speed)
 
 
-def spaceships_update_pose(spaceships, goal_positions, meteoroids, planet_positions, planet_radii, dims, max_speed, dt):
+def spaceships_update_pose(spaceships, goal_positions, planet_positions, planet_radii, meteoroids, dims, max_speed, dt, mode='all'):
   # MISSING: Need to compute the updated pose of all the spaceships
   # passed through the list spaceships
 
   # all the passed variables are defined the same was as in the potential fields/ velocity fields
   # dt is the timestep for the update.
+
+  # This is a placeholder for euler simulation
+  for i in range(np.shape(spaceships)[0]):
+    spaceships[i, :dims] = spaceships[i, :dims] + dt * get_velocity(spaceships[i, :dims], goal_positions[i], planet_positions, planet_radii, np.delete(spaceships, i, 0), meteoroids, dims, max_speed, mode)
 
   return spaceships
 
