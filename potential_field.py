@@ -167,18 +167,91 @@ class Obstacle(Entity):
         if (self.destructable):
             self.destoy_flag = True
 
+class Pose:
+    def __init__(self, pos, epsilon=1):
+        self.pos = pos
+        if len(pos.shape) == 2:
+            self.A = np.array([
+                [1, 0],
+                [0, 1/epsilon]
+            ])
+        else:
+            self.A = np.array([
+                [1, 0, 0],
+                [0, 0, -1/epsilon],
+                [0, 1/epsilon, 0]
+            ])
+        # Use the rotation matrix to encode orientation. Better generalises
+        # to 2D and 3D.
+        self.R = self.eye(len(pos.shape))
+
+    def move_using_holonomic_point(self, velocity, max_speed, max_angular_speed, dt):
+        if len(self.pose.shape) == 2:
+            self.R = np.array([
+                [np.cos(self.angle), -np.sin(self.angle)],
+                [np.sin(self.angle), np.cos(self.angle)]
+            ])
+
+        pose_vel = np.matmul(self.A, np.matmul(self.R, velocity))
+
+        linear_vel = pose_vel[0] * self.R[:,0]
+        if np.linalg.norm(linear_vel) > max_speed:
+            linear_vel *= max_speed/np.linalg.norm(max_speed)
+        self.pos += dt * linear_vel
+
+        if len(self.pose.shape) == 2:
+            S = np.array([[0, -1], [1, 0]])
+            dtheta = pose_vel[1]
+            if (dtheta==0): return
+        else:
+            theta_hat = np.matmul(self.R, np.array([0, pose_vel[1], pose_vel[2]]))
+            dtheta = np.linalg.norm(theta_hat)
+            if (dtheta==0): return
+            theta_hat /= dtheta
+            S = np.array([
+                [0, -theta_hat[2], theta_hat[1]],
+                [theta_hat[2], 0, -theta_hat[0]],
+                [-theta_hat[1], theta_hat[0], 0]
+            ])
+        if abs(dtheta) > max_angular_speed:
+            dtheta = max_angular_speed * np.sign(dtheta)
+        self.R += S*np.sin(dtheta*dt) + np.matmul(S,S)*(1 - np.cos(dtheta*dt))
+
+    def point_towards(self, pos):
+        displacement = pos - self.pos
+        if len(self.pos.shape) == 2:
+            angle = np.atan2(displacement[1], displacement[0])
+            self.R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+        else:
+            r1 = displacement/np.linalg.norm(displacement)
+            r2 = r1
+            r2[2] = 0
+            if (np.linalg.norm(r2) == 0):
+                r2[0] = 1
+            else:
+                angle = np.arcsin(r1[2]) - np.pi/2
+                r2 *= np.cos(angle)/np.linalg.norm(r2)
+                r2[2] = np.sin(angle)
+            r3 = np.cross(r1, r2)
+            self.R[:, 0] = r1
+            self.R[:, 1] = r2
+            self.R[:, 2] = r3
 
 class Agent(Entity):
-    def __init__(self, pos, radius):
+    def __init__(self, pos, radius, max_speed, max_angular_speed):
         super().__init__(pos, radius)
+        self.max_speed = max_speed
+        self.max_angular_speed = max_angular_speed
         self.velocity = np.zeros(pos.shape)
         self.goal = None
+        self.pose = Pose(self.pos)
 
     def get_obstacle_field_velocity(self, pos):
         return get_obstacle_field_velocity(pos, self.pos, self.radius)
 
     def update(self, dt):
-        self.pos += self.velocity * dt
+        self.pose.move_using_holonomic_point(self.velocity, self.max_speed, self.max_angular_speed, dt)
+        self.pos = self.pose.pos
         if at_goal(self.pos, self.goal):
             self.goal is None
 
@@ -190,7 +263,10 @@ class Agent(Entity):
         if self.goal is not None:
             self.velocity += get_goal_field_velocity(self.pos, self.goal)
 
-    
+    def point_towards(self, point):
+        self.pose.point_towards(point)
+
+
 class World:
     def __init__(self, num_dimensions, width):
         self.size = np.full(num_dimensions, width)
