@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pylab as plt
+import pygame as pg
 
 import potential_fields
 
@@ -243,6 +244,14 @@ class World:
     def log_agent_poses(self, i):
         for agent in agents:
             agent.log_pose(i)
+
+    def draw(self, surface, camera):
+        for obstacle in self.obstacles:
+            pos, radius = camera.transform_circle(obstacle.pos, obstacle.radius)
+            pg.draw.circle(surface, "#999999", pos, radius)
+        for agent in self.agents:
+            pos, radius = camera.transform_circle(agent.pos, agent.radius)
+            pg.draw.circle(surface, self.resource_colors[agent.resource], pos, radius)
 
     # Plot velocity field and entity positions at the current state, as well
     # the logged positions
