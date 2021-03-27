@@ -4,7 +4,7 @@ import matplotlib.pylab as plt
 from PIL import Image
 
 
-# Name of gif file that we save
+# Name of gif file that we save in the folder 'gifs'
 name = 'Meteoroid-Collision'
 # List of frames that we store to make a gif
 frames = []
