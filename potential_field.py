@@ -82,7 +82,7 @@ def cap(v, max_speed):
   return v
 
 
-def get_velocity(position, goal_position, planet_positions, planet_radii, other_spaceships, meteoroids, dims, max_speed, mode='all'):
+def get_velocity(position, goal_position, planet_positions, planet_radii, other_spaceships, meteoroids, dims, max_speed=float('inf'), mode='all'):
   if mode in ('goal', 'all'):
     v_goal = get_velocity_to_reach_goal(position, goal_position, dims)
   else:
