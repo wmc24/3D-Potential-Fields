@@ -121,6 +121,110 @@ def spaceships_update_pose(spaceships, goal_positions, planet_positions, planet_
   return spaceships
 
 
+""" Helper functions for entity classes """
+
+def get_obstacle_field_velocity(self, pos, obstacle_pos, obstacle_radius):
+    return np.zeros(pos.size) # TODO
+
+def get_goal_field_velocity(self, pos, obstacle_pos, obstacle_radius):
+    return np.zeros(pos.size) # TODO
+
+def at_goal(self, pos, goal):
+    return False # TODO
+
+def entities_collide(entity1, entity2):
+    return (np.hypot(entity1.pos - entity2.pos) <= entity1.radius + entity2.radius)
+
+
+""" Entity classes """
+
+class Entity:
+    def __init__(self, pos, radius):
+        # Each entity has a bounding sphere/circle
+        self.pos = pos
+        self.radius = radius
+    def get_obstacle_field_velocity(self, pos):
+        raise NotImplementedError("Entity subclass must implement 'update_obstacle_field_velocity'")
+    def update(self, dt):
+        raise NotImplementedError("Entity subclass must implement 'update'")
+
+
+# For planets and meteoroids. Meteroids are destructable
+class Obstacle(Entity):
+    def __init__(self, pos, radius, velocity, destructable=False):
+        super().__init__(pos, radius)
+        self.velocity = velocity
+        self.destructable = destructable
+        self.destroy_flag = False
+
+    def get_obstacle_field_velocity(self, pos):
+        return get_obstacle_field_velocity(pos, self.pos, self.radius)
+
+    def update(self, dt):
+        self.pos += self.velocity * dt
+
+    def in_collision_state(self):
+        if (self.destructable):
+            self.destoy_flag = True
+
+
+class Agent(Entity):
+    def __init__(self, pos, radius):
+        super().__init__(pos, radius)
+        self.velocity = np.zeros(pos.shape)
+        self.goal = None
+
+    def get_obstacle_field_velocity(self, pos):
+        return get_obstacle_field_velocity(pos, self.pos, self.radius)
+
+    def update(self, dt):
+        self.pos += self.velocity * dt
+        if at_goal(self.pos, self.goal):
+            self.goal is None
+
+    def set_goal(self, goal):
+        self.goal = goal
+
+    def set_velocity(self, obstacle_velocity):
+        self.velocity = velocity
+        if self.goal is not None:
+            self.velocity += get_goal_field_velocity(self.pos, self.goal)
+
+    
+class World:
+    def __init__(self, num_dimensions, width):
+        self.size = np.full(num_dimensions, width)
+        self.agents = []
+        self.obstacles = []
+
+    def update(self, dt):
+        for agent in agents:
+            velocity = np.zeros(self.size)
+            for obstacle in obstacles:
+                velocity += get_obstacle_field_velocity(agent.position)
+            for other_agent in agents:
+                if other_agent != agent:
+                    velocity += other_agent.get_velocity(agent.position)
+            agent.set_velocity(velocity)
+        for agent in agents:
+            agent.update(dt)
+        for obstacle in obstacles:
+            obstacle.update(dt)
+
+        # Now remove destructable obstacles in a collision state
+        for i in range(len(obstacles)):
+            for j in range(i+1, len(obstacles)):
+                if entities_collide(obstacles[i], obstacles[j]):
+                    obstacles[i].in_collision_state()
+                    obstacles[j].in_collision_state()
+        i = 0
+        while i != len(obstacles):
+            if obstacles[i].collision_flag:
+                obstacles.pop(i)
+            else:
+                i+=1
+
+
 # Default Arena
 DIMENSIONS = 2
 MAX_SPEED = .5
