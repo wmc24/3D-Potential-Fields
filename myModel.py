@@ -9,7 +9,7 @@ class Net(nn.Module):
       # so only inputs three variables which are the relative coordinates
       # of the goal to the spaceship - it is simple so it is easy to train
       self.linear1 = nn.Linear(3, 16)
-      self.linear2 = nn.linear(16, 3)
+      self.linear2 = nn.Linear(16, 3)
 
     # x represents our data
     def forward(self, x):
