@@ -135,6 +135,13 @@ def at_goal(self, pos, goal):
 def entities_collide(entity1, entity2):
     return (np.hypot(entity1.pos - entity2.pos) <= entity1.radius + entity2.radius)
 
+def obstacle_outside_bounds(obstacle, size):
+    if obstacle.pos[0] < -obstacle.radius and obstacle.velocity[0] < 0: return True
+    if obstacle.pos[0] > size[0]+obstacle.radius and obstacle.velocity[0] > 0: return True
+    if obstacle.pos[1] < -obstacle.radius and obstacle.velocity[1] < 0: return True
+    if obstacle.pos[1] < size[1]+obstacle.radius and obstacle.velocity[1] > 0: return True
+    return False
+
 
 """ Entity classes """
 
@@ -155,7 +162,7 @@ class Obstacle(Entity):
         super().__init__(pos, radius)
         self.velocity = velocity
         self.destructable = destructable
-        self.destroy_flag = False
+        self.remove_flag = False
 
     def get_obstacle_field_velocity(self, pos):
         return get_obstacle_field_velocity(pos, self.pos, self.radius)
@@ -163,9 +170,9 @@ class Obstacle(Entity):
     def update(self, dt):
         self.pos += self.velocity * dt
 
-    def in_collision_state(self):
+    def set_remove_flag(self):
         if (self.destructable):
-            self.destoy_flag = True
+            self.remove_flag = True
 
 class Pose:
     def __init__(self, pos, epsilon=1):
@@ -237,14 +244,28 @@ class Pose:
             self.R[:, 1] = r2
             self.R[:, 2] = r3
 
+    def get_vector(self):
+        if len(self.pos.shape) == 2:
+            angle = np.atan2(self.R[0,1], self.R[0,0])
+            return np.array([self.pos[0], self.pos[1], angle])
+        else:
+            return np.concatenate([self.pos, self.R[:,0]])
+
 class Agent(Entity):
-    def __init__(self, pos, radius, max_speed, max_angular_speed):
+    def __init__(self, pos, radius, max_speed, max_angular_speed, resource, log_size=None):
         super().__init__(pos, radius)
         self.max_speed = max_speed
         self.max_angular_speed = max_angular_speed
         self.velocity = np.zeros(pos.shape)
         self.goal = None
         self.pose = Pose(self.pos)
+        self.resource = resource
+        self.log_poses = None
+        if log_size is not None:
+            if len(self.pos.shape)==2:
+                log_poses = np.zeros((3, log_size))
+            else:
+                log_poses = np.zeros((6, log_size))
 
     def get_obstacle_field_velocity(self, pos):
         return get_obstacle_field_velocity(pos, self.pos, self.radius)
@@ -266,101 +287,107 @@ class Agent(Entity):
     def point_towards(self, point):
         self.pose.point_towards(point)
 
+    def log_pose(self, i):
+        if self.log_poses is not None and i < self.log_poses.shape[1]:
+            self.log_poses[:,i] = self.pose.get_vector()
 
 class World:
-    def __init__(self, num_dimensions, width):
+    def __init__(self, num_dimensions, width, meteoroid_spawn_rate):
         self.size = np.full(num_dimensions, width)
         self.agents = []
         self.obstacles = []
+        self.meteoroid_spawn_rate = meteoroid_spawn_rate
+        self.resource_colors = {}
+        self.resource_goals = {}
+
+    def valid_position(self, pos, radius):
+        for obstacle in obstacles:
+            if np.linalg.norm(obstacle.pos - pos) < obstacle.radius + radius:
+                return False
+        return True
+
+    def add_agent(self, pos, resource, color):
+        radius = 10
+        agents.append(Agent(pos, radius, color, 10, 1, resource))
+        resource_colors[resource] = color
+
+    def add_goal(self, resource, pos):
+        if not resource in resource_colors: return
+        if not resource in resource_goals:
+            resource_goals[resource] = []
+        resource_goals[resource].append(pos)
+
+    def get_velocity_field(self, position, agent=None):
+        velocity = np.zeros(self.size)
+        for obstacle in obstacles:
+            velocity += get_obstacle_field_velocity(agent.position)
+        for other_agent in agents:
+            if agent is None or other_agent != agent:
+                velocity += other_agent.get_velocity(agent.position)
 
     def update(self, dt):
         for agent in agents:
-            velocity = np.zeros(self.size)
-            for obstacle in obstacles:
-                velocity += get_obstacle_field_velocity(agent.position)
-            for other_agent in agents:
-                if other_agent != agent:
-                    velocity += other_agent.get_velocity(agent.position)
-            agent.set_velocity(velocity)
+            agent.set_velocity(get_velocity_field(agent.position, agent))
         for agent in agents:
             agent.update(dt)
         for obstacle in obstacles:
             obstacle.update(dt)
 
-        # Now remove destructable obstacles in a collision state
+        # Now remove destructable obstacles in a collision state or
+        # outside the arena (and moving out the arena)
         for i in range(len(obstacles)):
+            if obstacle_outside_bounds(obstacle[i], self.size):
+                obstacle[i].set_remove_flag()
             for j in range(i+1, len(obstacles)):
                 if entities_collide(obstacles[i], obstacles[j]):
-                    obstacles[i].in_collision_state()
-                    obstacles[j].in_collision_state()
+                    obstacles[i].set_remove_flag()
+                    obstacles[j].set_remove_flag()
+                    continue
         i = 0
         while i != len(obstacles):
-            if obstacles[i].collision_flag:
+            if obstacles[i].remove_flag:
                 obstacles.pop(i)
             else:
                 i+=1
 
+    def log_agent_poses(self, i):
+        for agent in agents:
+            agent.log_pose(i)
 
-# Default Arena
-DIMENSIONS = 2
-MAX_SPEED = .5
-SIZE_OF_UNIVERSE = 10.
-PLANET_POSITION = np.array([3., 2.], dtype=np.float32)
-PLANET_RADIUS = .3
-STATIONARY_SPACESHIP = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  normalize(np.array([.3, -4.], dtype=np.float32))))
-METEOROID = np.concatenate((np.array([-.3, 4.], dtype=np.float32),  MAX_SPEED * 2 * normalize(np.array([.3, -4.], dtype=np.float32))))
-GOAL_POSITION = np.array([2.5, 2.5], dtype=np.float32)
-START_POSITION = np.array([-2.5, -2.5], dtype=np.float32)
+    # Plot velocity field and entity positions at the current state, as well
+    # the logged positions
+    def plot(self):
+        if len(self.size) != 2:
+            return
 
+        fig, ax = plt.subplots()
+
+        N = 30
+        X, Y = np.meshgrid(np.linspace(0, self.size[0], N), np.linspace(0, self.size[1], N))
+        U = np.zeros_like(X)
+        V = np.zeros_like(Y)
+        for i, j in np.ndindex((N, N)):
+            velocity = get_velocity_field(np.array(X[i, j], Y[i, j]))
+            U[i, j] = velocity[0]
+            V[i, j] = velocity[1]
+        plt.quiver(X, Y, U, V, units="width")
+
+        for obstacle in obstacles:
+            ax.add_artist(plt.Circle(obstacle.position, obstacle.radius), color="gray")
+        for agent in agents:
+            ax.add_artist(plt.Circle(agent.position, agent.radius), color=self.resource_colors[agent.resource])
+            plt.plot(agent.log_poses[1,:], agent.log_poses[2,:], color=self.resource_colors[agent.resource])
+
+        for resource, goals in resource_goals.items():
+            for goal in goals:
+                plt.plot(goal[0], goal[1], self.resource_colors[resource], marker="x")
+
+        plt.axis('equal')
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.xlim([0, self.size[0]])
+        plt.ylim([0, self.size[1]])
+        plt.show()
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Runs obstacle avoidance with a potential field')
-  parser.add_argument('--mode', action='store', default='all', help='Which velocity field to plot.', choices=['planet', 'spaceship', 'meteoroid', 'goal', 'all'])
-  args, unknown = parser.parse_known_args()
-
-  fig, ax = plt.subplots()
-  # Plot field.
-  X, Y = np.meshgrid(np.linspace(-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2, 30),
-                     np.linspace(-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2, 30))
-  U = np.zeros_like(X)
-  V = np.zeros_like(X)
-  for i in range(len(X)):
-    for j in range(len(X[0])):
-      velocity = get_velocity(np.array([X[i, j], Y[i, j]]), GOAL_POSITION, np.array(PLANET_POSITION).reshape((-1, DIMENSIONS)), np.array(PLANET_RADIUS).reshape((-1, 1)), np.array(STATIONARY_SPACESHIP).reshape((-1, DIMENSIONS*2)), np.array(METEOROID).reshape((-1, DIMENSIONS*2)), DIMENSIONS, MAX_SPEED, mode='all')
-      U[i, j] = velocity[0]
-      V[i, j] = velocity[1]
-  plt.quiver(X, Y, U, V, units='width')
-
-  # Plot environment.
-  ax.add_artist(plt.Circle(PLANET_POSITION, PLANET_RADIUS, color='gray'))
-  plt.plot([-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], [-SIZE_OF_UNIVERSE/2, -SIZE_OF_UNIVERSE/2], 'k')
-  plt.plot([-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], [SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], 'k')
-  plt.plot([-SIZE_OF_UNIVERSE/2, -SIZE_OF_UNIVERSE/2], [-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], 'k')
-  plt.plot([SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], [-SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2], 'k')
-
-  # Plot a simple trajectory from the start position.
-  # Uses Euler integration.
-  # Also perform Euler integration of the meteoroid
-  dt = 0.01
-  x = START_POSITION
-  x_meteoroid = METEOROID[:DIMENSIONS]
-  positions = [x]
-  positions_meteoroid = [x_meteoroid]
-  for t in np.arange(0., 20., dt):
-    v = get_velocity(x, GOAL_POSITION, np.array(PLANET_POSITION).reshape((-1, DIMENSIONS)), np.array(PLANET_RADIUS).reshape((-1, 1)), np.array(STATIONARY_SPACESHIP).reshape((-1, DIMENSIONS*2)), np.array(METEOROID).reshape((-1, DIMENSIONS*2)), DIMENSIONS, MAX_SPEED, mode='all')
-    x = x + v * dt
-    positions.append(x)
-    v = METEOROID[DIMENSIONS:]
-    x_meteoroid = x_meteoroid + v * dt
-    positions_meteoroid.append(x_meteoroid)
-  positions = np.array(positions)
-  positions_meteoroid = np.array(positions_meteoroid)
-  plt.plot(positions[:, 0], positions[:, 1], lw=2, c='g')
-  plt.plot(positions_meteoroid[:, 0], positions_meteoroid[:, 1], lw=2, c='r')
-
-  plt.axis('equal')
-  plt.xlabel('x')
-  plt.ylabel('y')
-  plt.xlim([-.5 - SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2 + .5])
-  plt.ylim([-.5 - SIZE_OF_UNIVERSE/2, SIZE_OF_UNIVERSE/2 + .5])
-  plt.show()
+    world = World()
