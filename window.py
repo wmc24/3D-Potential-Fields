@@ -168,7 +168,7 @@ class Window:
 
         fig, ax = plt.subplots()
 
-        speed = 100
+        speed = 100 # Arbitrary
 
         N = 50
         corner1 = self.camera.untransform_position(np.array([0, 0]))
@@ -179,7 +179,7 @@ class Window:
         V = np.zeros_like(Y)
         for i, j in np.ndindex((N, N)):
             pos = np.array([X[i, j], Y[i, j]])
-            velocity = 0.1*self.world.get_velocity_field(pos, speed, self.active_agent)
+            velocity = self.world.get_velocity_field(pos, speed, self.active_agent)
             U[i, j] = velocity[0]
             V[i, j] = velocity[1]
         plt.quiver(X, Y, U, V, units="width")
@@ -193,7 +193,7 @@ class Window:
             plt.plot(log_poses[0,:], log_poses[1,:], color=color)
             if agent.goal is not None:
                 # Only plot active goals
-                plt.plot(agent.goal.pos[0], agent.goal.pos[1], color=color, marker="x")
+                plt.scatter(agent.goal.pos[0], agent.goal.pos[1], color=color, marker="x", s=100)
 
         plt.axis('equal')
         plt.xlabel('x')

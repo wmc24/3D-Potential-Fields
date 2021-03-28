@@ -71,6 +71,11 @@ class Agent(Entity):
         self.pos = self.pose.pos
         if self.goal is not None and self.goal.reached(self.pose):
             self.goal = None
+            # Also clear logged poses
+            self.log_i = 0
+            self.log_full = False
+            self.log_timer = 0
+            self.lot_poses = np.zeros_like(self.log_poses)
 
         self.log_timer += dt
         if self.log_timer >= 0.1:
