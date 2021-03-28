@@ -2,8 +2,6 @@ import numpy as np
 import matplotlib.pylab as plt
 import pygame as pg
 
-import potential_fields
-
 
 """ Helper functions for entity classes """
 
@@ -23,8 +21,6 @@ class Entity(object):
         # Each entity has a bounding sphere/circle
         self.pos = pos
         self.radius = radius
-    def get_obstacle_velocity_field(self, pos, speed):
-        raise NotImplementedError("Entity subclass must implement 'update_obstacle_field_velocity'")
     def update(self, dt):
         raise NotImplementedError("Entity subclass must implement 'update'")
 
@@ -38,9 +34,6 @@ class Obstacle(Entity):
         self.velocity = velocity
         self.destructable = destructable
         self.remove_flag = False
-
-    def get_obstacle_velocity_field(self, pos, speed):
-        return potential_fields.obstacle(pos, self.pos, self.radius, speed)
 
     def update(self, dt):
         self.pos += self.velocity * dt
@@ -137,22 +130,11 @@ class Agent(Entity):
             else:
                 self.log_poses = np.zeros((6, log_size))
 
-    def get_obstacle_velocity_field(self, pos, speed):
-        return potential_fields.obstacle(pos, self.pos, self.radius, speed)
-
     def update(self, dt):
         self.pose.move_using_holonomic_point(self.velocity, self.max_speed, self.max_angular_speed, dt)
         self.pos = self.pose.pos
         if self.goal is not None and np.linalg.norm(self.pos - self.goal) < 1: # TODO Use variable for this
             self.goal is None
-
-    def set_goal(self, goal):
-        self.goal = goal
-
-    def set_velocity(self, obstacle_velocity):
-        self.velocity = obstacle_velocity
-        if self.goal is not None:
-            self.velocity += potential_fields.goal(self.pos, self.goal, self.max_speed)
 
     def point_towards(self, point):
         self.pose.point_towards(point)
@@ -165,8 +147,9 @@ class Agent(Entity):
             self.log_poses[2,i] = vec[2]
 
 class World:
-    def __init__(self, num_dimensions, width, log_size=None):
+    def __init__(self, num_dimensions, width, vfields, log_size=None):
         self.size = np.full(num_dimensions, width)
+        self.vfields = vfields
         self.agents = []
         self.obstacles = []
         self.meteoroid_spawn_rate = 5
@@ -195,27 +178,24 @@ class World:
             resource_goals[resource] = []
         resource_goals[resource].append(pos)
 
-    def get_agent_velocity_field(self, agent):
+    def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
         for obstacle in self.obstacles:
-            velocity += obstacle.get_obstacle_velocity_field(agent.pos, agent.max_speed)
+            velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius, speed)
         for other_agent in self.agents:
-            if other_agent != agent:
-                velocity += other_agent.get_obstacle_velocity_field(agent.pos, agent.max_speed)
+            if agent is None or agent != other_agent:
+                velocity += self.vfields.obstacle(pos, other_agent.pos, other_agent.radius, speed)
+        if agent is not None and agent.goal is not None:
+            velocity += self.vfields.goal(pos, agent.goal, speed)
         return velocity
 
-    def get_velocity_field(self, pos, speed, exclude_agent = None):
-        velocity = np.zeros(len(self.size))
-        for obstacle in self.obstacles:
-            velocity += obstacle.get_obstacle_velocity_field(pos, speed)
-        for agent in self.agents:
-            if exclude_agent is not None and agent != exclude_agent:
-                velocity += agent.get_obstacle_velocity_field(pos, speed)
-        return velocity
+    def get_agent_velocity_field(self, agent):
+        return self.get_velocity_field(agent.pos, agent.max_speed, agent)
 
     def update(self, dt, log_i=None):
         for agent in self.agents:
-            agent.set_velocity(self.get_agent_velocity_field(agent))
+            agent.velocity = self.get_agent_velocity_field(agent)
+
         for agent in self.agents:
             agent.update(dt)
         for obstacle in self.obstacles:
@@ -245,69 +225,3 @@ class World:
     def log_agent_poses(self, i):
         for agent in agents:
             agent.log_pose(i)
-
-    def draw(self, surface, camera, plot, width, height, active_agent=-1):
-        for obstacle in self.obstacles:
-            pos = camera.transform_position(obstacle.pos)
-            radius = camera.transform_size(obstacle.radius)
-            pg.draw.circle(surface, "#999999", pos, radius)
-        agent_i = 0
-        for agent in self.agents:
-            pos = camera.transform_position(agent.pos)
-            radius = camera.transform_size(agent.radius)
-            pg.draw.circle(surface, self.resource_colors[agent.resource], pos, radius)
-            if agent_i == active_agent:
-                pg.draw.circle(surface, self.resource_colors[agent.resource], pos, radius+5, 2)
-            agent_i+=1
-
-        if plot:
-            N = 50
-            X, Y = np.meshgrid(np.linspace(0, width, N), np.linspace(0, height, N))
-            for i, j in np.ndindex((N, N)):
-                screen_pos = np.array([X[i, j], Y[i, j]])
-                pos = camera.untransform_position(screen_pos)
-                if active_agent != -1 and active_agent < len(self.agents):
-                    velocity = self.get_observer_velocity_field(pos, 100, self.agents[active_agent])
-                else:
-                    velocity = self.get_velocity_field(pos, 100)
-                velocity = camera.transform_direction(velocity) * 0.8
-                pg.draw.line(surface, "#ffffff", screen_pos, screen_pos+velocity, 2)
-
-
-    # Plot velocity field and entity positions at the current state, as well
-    # the logged positions
-    def plot(self):
-        if len(self.size) != 2:
-            return
-
-        fig, ax = plt.subplots()
-
-        speed = 100
-
-        N = 30
-        X, Y = np.meshgrid(np.linspace(0, self.size[0], N), np.linspace(0, self.size[1], N))
-        U = np.zeros_like(X)
-        V = np.zeros_like(Y)
-        for i, j in np.ndindex((N, N)):
-            velocity = self.get_velocity_field(np.array([X[i, j], Y[i, j]]), speed)
-            U[i, j] = velocity[0]
-            V[i, j] = velocity[1]
-        plt.quiver(X, Y, U, V, units="width")
-
-        for obstacle in self.obstacles:
-            ax.add_artist(plt.Circle(obstacle.pos, obstacle.radius, color="gray"))
-        for agent in self.agents:
-            ax.add_artist(plt.Circle(agent.pos, agent.radius, color=self.resource_colors[agent.resource]))
-            if agent.log_poses is not None:
-                plt.plot(agent.log_poses[0,:], agent.log_poses[1,:], color=self.resource_colors[agent.resource])
-
-        for resource, goals in self.resource_goals.items():
-            for goal in goals:
-                plt.plot(goal[0], goal[1], self.resource_colors[resource], marker="x")
-
-        plt.axis('equal')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.xlim([0, self.size[0]])
-        plt.ylim([0, self.size[1]])
-        plt.show()
