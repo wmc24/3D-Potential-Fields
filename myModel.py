@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Net(nn.Module):
+class BasicGoalNet(nn.Module):
     def __init__(self):
-      super(Net, self).__init__()
+      super(BasicGoalNet, self).__init__()
       # Temporary model that has been designed for the goal potential only
       # so only inputs three variables which are the relative coordinates
       # of the goal to the spaceship - it is simple so it is easy to train

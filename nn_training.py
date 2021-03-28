@@ -21,22 +21,22 @@ from torch.utils.data import Dataset as BaseDataset
 DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-load_model = True
-loaded_model_name = 'Debugging'
-save_model_name = 'Debugging'
+load_model = False
+loaded_model_name = 'Goal-Potential'
+save_model_name = 'Goal-Potential'
 tensorboard_name = save_model_name
 perform_training = True
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
-num_epochs = 10
+num_epochs = None
 learning_rate = 1e-5
 batch_size = 10
+batch_size_doubling_epochs = 100000
 
 # How many epochs to save things
-model_epochs = 100
-model_checkpoint_epochs = 2000
-training_vis_epochs = 1
+model_epochs = 1000
+model_checkpoint_epochs = 50000
 
 
 """-------------------------------------------------------------------------"""
@@ -72,7 +72,7 @@ print("Device Used:", DEVICE)
 
 
 # Loading a network
-model = myModel.Net()
+model = myModel.BasicGoalNet()
 
 if load_model is True:
     # Loading the model weights
@@ -121,15 +121,23 @@ class Dataset(BaseDataset):
         self.planets_pot = planets_pot
         self.spaceships_pot = spaceships_pot
         self.meteoroids_pot = meteoroids_pot
+        self.size_of_universe = size_of_universe
         self.dims = 2
 
     def __getitem__(self, i):
-        goal_position = [i, i, i]
+        # Set the position as the centre as the net expects
+        # relative coordinates
+        position = np.array([0, 0, 0])
+
+        # Generating a random goal position using a uniform distribution and its associated velocity
+        goal_position = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=3)
+        goal_velocity = potential_field.get_velocity_to_reach_goal(position, goal_position, self.dims)
+
+        # Defining the rest of the environment NEED TO MODIFY IN FUTURE
         planet_positions = []
         planet_radii = []
         spaceships = []
         meteoroids = []
-        velocity = [1, 2, 3]
 
         # Reshaping to the desired shapes and converting to numpy arrays
         goal_position = np.array(goal_position)
@@ -137,11 +145,11 @@ class Dataset(BaseDataset):
         planet_radii = np.array(planet_radii).reshape((-1, 1))
         spaceships = np.array(spaceships).reshape((-1, self.dims*2))
         meteoroids = np.array(meteoroids).reshape((-1, self.dims*2))
-        velocity = np.array(velocity) #MIGHT REMOVE THIS
 
+        # Getting the velocity array
+        velocity = goal_velocity
 
-
-        return goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity
+        return goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity
         
     def __len__(self):
         return batch_size
@@ -158,26 +166,61 @@ dataloader = DataLoader(train_dataset, batch_size=batch_size)
 
 if perform_training is True:
     print("Training")
+    model.to(DEVICE)
     model.train()
     loss = nn.MSELoss().to(DEVICE)
     try:
         i = epoch + 1
         while True:
             # Perfoming training
-            with tqdm(dataloader, desc='\nEpoch: {}'.format(i), file=sys.stdout) as iterator:
-                for goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity in iterator:
-                    goal_position = goal_position.to(DEVICE).float()
-                    planet_positions = planet_positions.to(DEVICE).float()
-                    planet_radii = planet_radii.to(DEVICE).float()
-                    spaceships = spaceships.to(DEVICE).float()
-                    meteoroids = meteoroids.to(DEVICE).float()
-                    velocity = velocity.to(DEVICE).float()
 
-                    optimizer.zero_grad()
-                    prediction = model.forward(goal_position, planet_positions, planet_radii, spaceships, meteoroids)
-                    total_loss = loss(prediction, velocity)
-                    total_loss.backward()
-                    optimizer.step()
+            for index, (goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity) in enumerate(dataloader):
+                #goal_position = goal_position.to(DEVICE).float()
+                #planet_positions = planet_positions.to(DEVICE).float()
+                #planet_radii = planet_radii.to(DEVICE).float()
+                #spaceships = spaceships.to(DEVICE).float()
+                #meteoroids = meteoroids.to(DEVICE).float()
+                #velocity = velocity.to(DEVICE).float()
+
+                optimizer.zero_grad()
+                prediction, goal_prediction = model.forward(goal_position.to(DEVICE).float(), 
+                                                            planet_positions.to(DEVICE).float(), 
+                                                            planet_radii.to(DEVICE).float(), 
+                                                            spaceships.to(DEVICE).float(), 
+                                                            meteoroids.to(DEVICE).float())
+                total_loss = loss(prediction, velocity.to(DEVICE).float())
+                total_loss.backward()
+                optimizer.step()
+            
+            # Writing values to tensorboard
+            if i % 100 == 0 or i == 1:
+                print('\nEpoch: {}'.format(i))
+                prediction = prediction.cpu().detach().numpy()
+                goal_prediction = goal_prediction.cpu().detach().numpy()
+                velocity = velocity.numpy()
+                goal_velocity = goal_velocity.numpy()
+                writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
+                writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
+                                {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
+                                'z - mean': np.mean(np.abs(velocity[:, 2] - prediction[:, 2])),
+                                'x - median': np.median(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                'y - median': np.median(np.abs(velocity[:, 1] - prediction[:, 1])),
+                                'z - median': np.median(np.abs(velocity[:, 2] - prediction[:, 2]))},
+                                global_step=i)
+                writer.add_scalars(f'{tensorboard_name}/3 - Absolute Goal Velocity Errors (m/s)',
+                                {'x - mean': np.mean(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                'y - mean': np.mean(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
+                                'z - mean': np.mean(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2])),
+                                'x - median': np.median(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
+                                'z - median': np.median(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2]))},
+                                global_step=i)
+                writer.add_scalar(f'{tensorboard_name}/4 - Batch Size', batch_size, global_step=i)
+            
+            # Doubling the batch size every n epochs
+            if i % batch_size_doubling_epochs == 0:
+                batch_size = batch_size * 2
 
             # Saving the model every n epochs and saving a backup in
             # case of a model corruption when interrupting
