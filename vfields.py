@@ -19,7 +19,7 @@ class AnalyticalVFields(VFields):
         distance = np.linalg.norm(displacement)
         if distance > obstacle_radius:
             direction = displacement / distance
-            return speed*direction*np.exp(-(distance-obstacle_radius)/self.decay_radius)
+            return 5*speed*direction*np.exp(-(distance-obstacle_radius)/self.decay_radius)
         else:
             return np.zeros_like(pos)
 

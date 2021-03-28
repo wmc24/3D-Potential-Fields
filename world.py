@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pylab as plt
 import pygame as pg
 
+from geometry import Pose2D, Pose3D
+
 
 """ Helper functions for entity classes """
 
@@ -42,113 +44,62 @@ class Obstacle(Entity):
         if (self.destructable):
             self.remove_flag = True
 
-class Pose(object):
-    def __init__(self, pos, epsilon=1):
-        self.pos = pos
-        self.N = pos.size
-        if self.N:
-            self.A = np.array([
-                [1, 0],
-                [0, 1/epsilon]
-            ])
-        else:
-            self.A = np.array([
-                [1, 0, 0],
-                [0, 0, -1/epsilon],
-                [0, 1/epsilon, 0]
-            ])
-        # Use the rotation matrix to encode orientation. Better generalises
-        # to 2D and 3D.
-        self.R = np.eye(self.N, dtype=np.float32)
-
-    def move_using_holonomic_point(self, velocity, max_speed, max_angular_speed, dt):
-        pose_vel = np.matmul(self.A, np.matmul(self.R.transpose(), velocity))
-
-        linear_vel = pose_vel[0] * self.R[:,0]
-        if np.linalg.norm(linear_vel) > max_speed:
-            linear_vel *= max_speed/np.linalg.norm(max_speed)
-        self.pos += dt * linear_vel
-
-        if self.N == 2:
-            S = np.array([[0, -1], [1, 0]])
-            dtheta = pose_vel[1]
-            if (dtheta==0): return
-        else:
-            theta_hat = np.matmul(self.R, np.array([0, pose_vel[1], pose_vel[2]]))
-            dtheta = np.linalg.norm(theta_hat)
-            if (dtheta==0): return
-            theta_hat /= dtheta
-            S = np.array([
-                [0, -theta_hat[2], theta_hat[1]],
-                [theta_hat[2], 0, -theta_hat[0]],
-                [-theta_hat[1], theta_hat[0], 0]
-            ])
-        if abs(dtheta) > max_angular_speed:
-            dtheta = max_angular_speed * np.sign(dtheta)
-        self.R += S*np.sin(dtheta*dt) + np.matmul(S,S)*(1 - np.cos(dtheta*dt))
-
-    def point_towards(self, pos):
-        displacement = pos - self.pos
-        if self.N == 2:
-            angle = np.arctan2(displacement[1], displacement[0])
-            self.R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-        else:
-            r1 = displacement/np.linalg.norm(displacement)
-            r2 = r1
-            r2[2] = 0
-            if (np.linalg.norm(r2) == 0):
-                r2[0] = 1
-            else:
-                angle = np.arcsin(r1[2]) - np.pi/2
-                r2 *= np.cos(angle)/np.linalg.norm(r2)
-                r2[2] = np.sin(angle)
-            r3 = np.cross(r1, r2)
-            self.R[:, 0] = r1
-            self.R[:, 1] = r2
-            self.R[:, 2] = r3
-
-    def get_vector(self):
-        if self.N == 2:
-            angle = np.arctan2(self.R[0,1], self.R[0,0])
-            return np.array([self.pos[0], self.pos[1], angle])
-        else:
-            return np.concatenate([self.pos, self.R[:,0]])
-
 class Agent(Entity):
-    def __init__(self, pos, radius, max_speed, max_angular_speed, resource, log_size=None):
+    def __init__(self, pos, radius, max_speed, max_angular_speed, resource, log_size=0):
         super(Agent,self).__init__(pos, radius)
         self.max_speed = max_speed
         self.max_angular_speed = max_angular_speed
         self.velocity = np.zeros(pos.shape)
         self.goal = None
-        self.pose = Pose(self.pos)
+        self.last_goal_i = -1
+        if self.pos.size == 2:
+            self.pose = Pose2D(self.pos)
+        else:
+            self.pose = Pose3D(self.pos)
         self.resource = resource
-        self.log_poses = None
-        if log_size is not None:
-            if self.pos.size==2:
-                self.log_poses = np.zeros((3, log_size))
-            else:
-                self.log_poses = np.zeros((6, log_size))
+
+        self.log_i = 0
+        self.log_full = False
+        self.log_timer = 0
+        if self.pos.size==2:
+            self.log_poses = np.zeros((3, log_size))
+        else:
+            self.log_poses = np.zeros((6, log_size))
 
     def update(self, dt):
         self.pose.move_using_holonomic_point(self.velocity, self.max_speed, self.max_angular_speed, dt)
         self.pos = self.pose.pos
-        if self.goal is not None and np.linalg.norm(self.pos - self.goal) < 1: # TODO Use variable for this
-            self.goal is None
+        if self.goal is not None and np.linalg.norm(self.pos - self.goal) < 10: # TODO Use variable for this
+            self.goal = None
+
+        self.log_timer += dt
+        if self.log_timer >= 0.1:
+            self.log_pose()
+            self.log_timer = 0
 
     def point_towards(self, point):
         self.pose.point_towards(point)
 
-    def log_pose(self, i):
-        if self.log_poses is not None and i < self.log_poses.shape[1]:
-            vec = self.pose.get_vector()
-            self.log_poses[0,i] = vec[0]
-            self.log_poses[1,i] = vec[1]
-            self.log_poses[2,i] = vec[2]
+    def log_pose(self):
+        if self.log_poses.shape[1] == 0: return
+        vec = self.pose.get_vector()
+        self.log_poses[0,self.log_i] = vec[0]
+        self.log_poses[1,self.log_i] = vec[1]
+        self.log_poses[2,self.log_i] = vec[2]
+        self.log_i = (self.log_i+1)%self.log_poses.shape[1]
+        if not self.log_full and self.log_i == 0:
+            self.log_full = True
+
+    def get_log_poses(self):
+        if self.log_full:
+            return np.concatenate([self.log_poses[:, self.log_i:], self.log_poses[:, :self.log_i]], axis=1)
+        else:
+            return self.log_poses[:, :self.log_i]
 
 class World:
-    def __init__(self, num_dimensions, width, vfields, log_size=None):
-        self.size = np.full(num_dimensions, width)
+    def __init__(self, N, width, vfields, log_size=0):
+        self.N = N
+        self.size = np.full(N, width)
         self.vfields = vfields
         self.agents = []
         self.obstacles = []
@@ -173,10 +124,10 @@ class World:
         self.agents.append(Agent(pos, radius, max_speed, max_angular_speed, resource, self.log_size))
         self.resource_colors[resource] = color
 
-    def add_goal(self, resource, pos):
-        if not resource in resource_goals:
-            resource_goals[resource] = []
-        resource_goals[resource].append(pos)
+    def add_goal(self, pos, resource):
+        if not resource in self.resource_goals:
+            self.resource_goals[resource] = []
+        self.resource_goals[resource].append(pos)
 
     def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
@@ -189,12 +140,21 @@ class World:
             velocity += self.vfields.goal(pos, agent.goal, speed)
         return velocity
 
-    def get_agent_velocity_field(self, agent):
-        return self.get_velocity_field(agent.pos, agent.max_speed, agent)
+    def set_new_goal(self, agent):
+        if not agent.resource in self.resource_goals: return
+        resources = self.resource_goals[agent.resource]
+        if (len(resources) < 2): return
 
-    def update(self, dt, log_i=None):
+        indexes = [i for i in range(len(resources)) if i != agent.last_goal_i]
+        i = np.random.randint(len(indexes))
+        agent.goal = resources[indexes[i]]
+        agent.last_goal_i = indexes[i]
+
+    def update(self, dt):
         for agent in self.agents:
-            agent.velocity = self.get_agent_velocity_field(agent)
+            if agent.goal is None:
+                self.set_new_goal(agent)
+            agent.velocity = self.get_velocity_field(agent.pos, agent.max_speed, agent)
 
         for agent in self.agents:
             agent.update(dt)
@@ -217,10 +177,6 @@ class World:
                 self.obstacles.pop(i)
             else:
                 i+=1
-
-        if log_i is not None and self.log_size is not None:
-            for agent in self.agents:
-                agent.log_pose(log_i)
 
     def log_agent_poses(self, i):
         for agent in agents:
