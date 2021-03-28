@@ -100,9 +100,15 @@ class Pose3D(object):
 
 
 class Goal:
-    def __init__(self, pos, direction):
+    def __init__(self, pos, direction, close_dist=20):
         self.pos = pos
         self.direction = direction
+        self.close_dist = close_dist
     def reached(self, pose):
-        # Ignore direction for now
-        return np.linalg.norm(pose.pos - self.pos) < 10
+        disp = pose.pos - self.pos
+        dist = np.linalg.norm(disp)
+        return dist < self.close_dist
+        # cos_theta = np.dot(pose.get_direction(), self.direction)
+        # if dist < self.close_dist:
+        #     print(cos_theta)
+        # return dist < self.close_dist and cos_theta > 0.87 # < 30 degrees

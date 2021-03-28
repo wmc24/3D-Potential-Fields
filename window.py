@@ -125,6 +125,17 @@ class Window:
                 pg.draw.polygon(self.surface, color, points)
 
     def draw_entities(self):
+        for resource, goals in self.world.resource_goals.items():
+            for i, goal in enumerate(goals):
+                pos = self.camera.transform_position(goal.pos)
+                direction = self.camera.transform_direction(goal.direction)
+                color = self.world.resource_colors[resource]
+                radius = self.camera.transform_size(goal.close_dist/2)
+                dir_length = self.camera.transform_size(50)
+                pg.draw.circle(self.surface, color, pos, radius)
+                pg.draw.line(self.surface, color,
+                    pos, pos+direction*dir_length, 2)
+
         for obstacle in self.world.obstacles:
             pos = self.camera.transform_position(obstacle.pos)
             radius = self.camera.transform_size(obstacle.radius)
@@ -142,30 +153,14 @@ class Window:
             pg.draw.line(self.surface, color, pos, pos + velocity_line)
 
             if agent == self.active_agent:
-                pg.draw.circle(self.surface, self.world.resource_colors[agent.resource], pos, radius+5, 2)
+                outer_radius = self.camera.transform_size(agent.radius+10)
+                pg.draw.circle(self.surface, self.world.resource_colors[agent.resource], pos, outer_radius, 2)
 
             if agent.goal is not None:
                 goal_pos = self.camera.transform_position(agent.goal.pos)
-                pg.draw.circle(self.surface, color, goal_pos, 12, 2)
-
-        for resource, goals in self.world.resource_goals.items():
-            for i, goal in enumerate(goals):
-                pos = self.camera.transform_position(goal.pos)
-                color = self.world.resource_colors[resource]
-                size = 4
-                width = 2
-                pg.draw.line(
-                    self.surface,
-                    color,
-                    pos+np.array([-size, -size]),
-                    pos+np.array([size, size]),
-                    width)
-                pg.draw.line(
-                    self.surface,
-                    color,
-                    pos+np.array([-size, size]),
-                    pos+np.array([size, -size]),
-                    width)
+                goal_direction = self.camera.transform_direction(agent.goal.direction)
+                close_radius = self.camera.transform_size(goal.close_dist)
+                pg.draw.circle(self.surface, color, goal_pos, close_radius, 2)
 
     def plot(self):
         if len(self.world.size) != 2:

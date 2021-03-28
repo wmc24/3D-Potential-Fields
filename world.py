@@ -117,10 +117,7 @@ class World:
     def add_planet(self, pos, radius):
         self.obstacles.append(Obstacle(pos,radius))
 
-    def add_agent(self, pos, resource, color):
-        radius = 10
-        max_speed = 1000
-        max_angular_speed = 3
+    def add_agent(self, pos, radius, max_speed, max_angular_speed, resource, color):
         self.agents.append(Agent(pos, radius, max_speed, max_angular_speed, resource, self.log_size))
         self.resource_colors[resource] = color
 
@@ -133,18 +130,22 @@ class World:
         angle = np.random.random()*2*np.pi
         direction = np.array([np.cos(angle), np.sin(angle)])
         planet = self.obstacles[planet_i]
-        pos = planet.pos + planet.radius*direction
+        pos = planet.pos + 1.5*planet.radius*direction
         self.resource_goals[resource].append(Goal(pos, -direction))
 
     def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
         for obstacle in self.obstacles:
-            velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius, speed)
+            velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius)
         for other_agent in self.agents:
             if agent is None or agent != other_agent:
-                velocity += self.vfields.obstacle(pos, other_agent.pos, other_agent.radius, speed)
+                velocity += self.vfields.obstacle(pos, other_agent.pos, other_agent.radius)
         if agent is not None and agent.goal is not None:
-            velocity += self.vfields.goal(pos, agent.goal.pos, agent.goal.direction, speed)
+            velocity += self.vfields.goal(pos, agent.goal)
+
+        # The above gives a "normalised" field. Scale with speed, such that
+        # a speed of 1, gives a speed of "speed"
+        velocity *= speed * 0.1
         return velocity
 
     def set_new_goal(self, agent):

@@ -1,37 +1,58 @@
 import numpy as np
 
-# Implement as classes, so you can pass an object to calculate the velocity
-# fields. Makes it easier to swap between analytical and neural net.
-
 class VFields(object):
-    def obstacle(self, pos, obstacle_pos, obstacle_radius, speed):
-        raise NotImplementedError("VFields child class must implement 'obstacle'")
-    def goal(self, pos, goal_pos, speed):
-        raise NotImplementedError("VFields child class must implement 'obstacle'")
+    def obstacle(self, pos, obstacle_pos, obstacle_radius):
+        disp = pos - obstacle_pos
+        dist = np.linalg.norm(disp)
+        return (disp/dist) * self._obstacle(dist, obstacle_radius)
+
+    def _obstacle(self, dist, radius):
+        raise NotImplementedError("VFields child class must implement '_obstacle'")
+
+    def goal(self, pos, goal):
+        disp = pos - goal.pos
+        u1 = -goal.direction
+        disp1_comp = np.dot(disp, u1)
+        disp1 = -goal.direction * u1
+        disp2 = disp - disp1
+        disp2_comp = np.linalg.norm(disp2)
+        u2 = disp2 / disp2_comp
+        relative_disp = np.array([disp1_comp, disp2_comp])
+        relative_vel = self._goal(relative_disp)
+        return u1*relative_vel[0] + u2*relative_vel[1]
+
+    def _goal(self, disp):
+        raise NotImplementedError("VFields child class must implement '_goal'")
+
 
 class AnalyticalVFields(VFields):
-    def __init__(self, decay_radius, convergence_radius):
+    def __init__(self, decay_radius, convergence_radius, obstacle_scale, alpha):
         self.decay_radius = decay_radius
         self.convergence_radius = convergence_radius
+        self.obstacle_scale = obstacle_scale
+        self.alpha = alpha
 
-    def obstacle(self, pos, obstacle_pos, obstacle_radius, speed):
-        displacement = pos - obstacle_pos
-        distance = np.linalg.norm(displacement)
-        if distance > obstacle_radius*0.95:
-            direction = displacement / distance
-            return 0.2*speed*direction*np.exp(-(distance-obstacle_radius*0.95)/self.decay_radius)
+    def _obstacle(self, dist, radius):
+        if dist > radius:
+            return self.obstacle_scale*np.exp(-(dist-radius)/self.decay_radius)
         else:
-            return np.zeros_like(pos)
+            return 0
 
-    def goal(self, pos, goal_pos, goal_direction, speed):
-        displacement = goal_pos - pos
-        distance = np.linalg.norm(displacement)
-        velocity =  speed * displacement / distance
+    def _goal(self, disp):
+        # Potential = |x| + alpha*tan(theta)**2
+        dist = np.linalg.norm(disp)
+        if dist < self.convergence_radius:
+            velocity = -disp / self.convergence_radius
+        else:
+            velocity = -disp / dist
+        # velocity += self.alpha * (disp[0]/disp[1]**3)*np.array([disp[1], -disp[0]])
+        return velocity
+
 
 class NeuralNetVFields(VFields):
     def __init__(self):
         pass
-    def obstacle(self, pos, obstacle_pos, obstacle_radius, speed):
+    def _obstacle(self, dist, radius):
         pass
-    def goal(self, pos, goal_pos, speed):
+    def goal(self, disp):
         pass
