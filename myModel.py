@@ -28,4 +28,6 @@ class Net(nn.Module):
       # the output by the max speed CHANGE THIS
       output = torch.tanh(x)
 
-      return output
+      goal_output = output
+
+      return output, goal_output
