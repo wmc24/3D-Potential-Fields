@@ -32,7 +32,7 @@ perform_training = True
 num_epochs = None
 learning_rate = 1e-5
 batch_size = 10
-batch_size_doubling_epochs = 100000
+batch_size_doubling_epochs = [100000, 250000, 1000000]
 
 # How many epochs to save things
 model_epochs = 1000
@@ -218,8 +218,8 @@ if perform_training is True:
                                 global_step=i)
                 writer.add_scalar(f'{tensorboard_name}/4 - Batch Size', batch_size, global_step=i)
             
-            # Doubling the batch size every n epochs
-            if i % batch_size_doubling_epochs == 0:
+            # Doubling the batch size at fixed epochs
+            if i in batch_size_doubling_epochs:
                 batch_size = batch_size * 2
 
             # Saving the model every n epochs and saving a backup in
