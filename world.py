@@ -185,7 +185,7 @@ class World:
 
     def add_agent(self, pos, resource, color):
         radius = 10
-        max_speed = 100
+        max_speed = 1000
         max_angular_speed = 3
         self.agents.append(Agent(pos, radius, max_speed, max_angular_speed, resource, self.log_size))
         self.resource_colors[resource] = color
@@ -200,16 +200,17 @@ class World:
         for obstacle in self.obstacles:
             velocity += obstacle.get_obstacle_velocity_field(agent.pos, agent.max_speed)
         for other_agent in self.agents:
-            if agent is None or other_agent != agent:
+            if other_agent != agent:
                 velocity += other_agent.get_obstacle_velocity_field(agent.pos, agent.max_speed)
         return velocity
 
-    def get_velocity_field(self, pos, speed):
+    def get_velocity_field(self, pos, speed, exclude_agent = None):
         velocity = np.zeros(len(self.size))
         for obstacle in self.obstacles:
             velocity += obstacle.get_obstacle_velocity_field(pos, speed)
         for agent in self.agents:
-            velocity += agent.get_obstacle_velocity_field(pos, speed)
+            if exclude_agent is not None and agent != exclude_agent:
+                velocity += agent.get_obstacle_velocity_field(pos, speed)
         return velocity
 
     def update(self, dt, log_i=None):
@@ -245,13 +246,33 @@ class World:
         for agent in agents:
             agent.log_pose(i)
 
-    def draw(self, surface, camera):
+    def draw(self, surface, camera, plot, width, height, active_agent=-1):
         for obstacle in self.obstacles:
-            pos, radius = camera.transform_circle(obstacle.pos, obstacle.radius)
+            pos = camera.transform_position(obstacle.pos)
+            radius = camera.transform_size(obstacle.radius)
             pg.draw.circle(surface, "#999999", pos, radius)
+        agent_i = 0
         for agent in self.agents:
-            pos, radius = camera.transform_circle(agent.pos, agent.radius)
+            pos = camera.transform_position(agent.pos)
+            radius = camera.transform_size(agent.radius)
             pg.draw.circle(surface, self.resource_colors[agent.resource], pos, radius)
+            if agent_i == active_agent:
+                pg.draw.circle(surface, self.resource_colors[agent.resource], pos, radius+5, 2)
+            agent_i+=1
+
+        if plot:
+            N = 50
+            X, Y = np.meshgrid(np.linspace(0, width, N), np.linspace(0, height, N))
+            for i, j in np.ndindex((N, N)):
+                screen_pos = np.array([X[i, j], Y[i, j]])
+                pos = camera.untransform_position(screen_pos)
+                if active_agent != -1 and active_agent < len(self.agents):
+                    velocity = self.get_observer_velocity_field(pos, 100, self.agents[active_agent])
+                else:
+                    velocity = self.get_velocity_field(pos, 100)
+                velocity = camera.transform_direction(velocity) * 0.8
+                pg.draw.line(surface, "#ffffff", screen_pos, screen_pos+velocity, 2)
+
 
     # Plot velocity field and entity positions at the current state, as well
     # the logged positions

@@ -11,7 +11,7 @@ def main():
     surface = pg.display.set_mode((WIDTH, HEIGHT))
 
     world = World(2, 1000)
-    world.add_planet(np.array([0, 0], dtype=np.float32), 100)
+    world.add_planet(np.array([-300, -300], dtype=np.float32), 100)
     world.add_planet(np.array([0, 200], dtype=np.float32), 80)
     world.add_agent(np.array([100, 0], dtype=np.float32), "A", "#ff0000")
     world.add_agent(np.array([-100, 0], dtype=np.float32), "B", "#00ff00")
@@ -20,6 +20,8 @@ def main():
     camera.scale = 2
     camera_speed = 5
 
+    paused = False
+
     clock = pg.time.Clock()
     while True:
         dt = clock.tick()/1000.0
@@ -27,15 +29,19 @@ def main():
             if event.type == pg.QUIT:
                 return
             if event.type == pg.KEYDOWN:
-                camera.set_key(event.key, 1)
+                if event.key == pg.K_ESCAPE:
+                    paused = not paused
+                else:
+                    camera.set_key(event.key, 1)
             if event.type == pg.KEYUP:
                 camera.set_key(event.key, 0)
 
-        camera.update(dt)
-        world.update(dt)
+        if not paused:
+            camera.update(dt)
+            world.update(dt)
 
         surface.fill("#000000", pg.Rect(0, 0, WIDTH, HEIGHT))
-        world.draw(surface, camera)
+        world.draw(surface, camera, paused, WIDTH, HEIGHT, 0)
         pg.display.update()
 
     # world.plot()
