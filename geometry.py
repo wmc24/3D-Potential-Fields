@@ -98,3 +98,11 @@ class Pose3D(object):
     def get_vector(self):
         return np.concatenate([self.pos, self.R[:,0]])
 
+
+class Goal:
+    def __init__(self, pos, direction):
+        self.pos = pos
+        self.direction = direction
+    def reached(self, pose):
+        # Ignore direction for now
+        return np.linalg.norm(pose.pos - self.pos) < 10

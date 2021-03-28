@@ -19,11 +19,10 @@ def main():
     world.add_agent(np.array([100, 0], dtype=np.float32), "A", "#ff0000")
     world.add_agent(np.array([-100, 0], dtype=np.float32), "B", "#00ff00")
 
-    world.add_goal(np.array([-100, 200], dtype=np.float32), "A")
-    world.add_goal(np.array([300, 200], dtype=np.float32), "A")
-
-    world.add_goal(np.array([-300, 200], dtype=np.float32), "B")
-    world.add_goal(np.array([-500, 200], dtype=np.float32), "B")
+    world.add_goal(0, "A")
+    world.add_goal(1, "A")
+    world.add_goal(0, "B")
+    world.add_goal(1, "B")
 
     window = Window("Spaceships", 1200, 800, world)
 

@@ -17,19 +17,16 @@ class AnalyticalVFields(VFields):
     def obstacle(self, pos, obstacle_pos, obstacle_radius, speed):
         displacement = pos - obstacle_pos
         distance = np.linalg.norm(displacement)
-        if distance > obstacle_radius:
+        if distance > obstacle_radius*0.95:
             direction = displacement / distance
-            return 5*speed*direction*np.exp(-(distance-obstacle_radius)/self.decay_radius)
+            return 0.2*speed*direction*np.exp(-(distance-obstacle_radius*0.95)/self.decay_radius)
         else:
             return np.zeros_like(pos)
 
-    def goal(self, pos, goal_pos, speed):
+    def goal(self, pos, goal_pos, goal_direction, speed):
         displacement = goal_pos - pos
         distance = np.linalg.norm(displacement)
-        if distance < self.convergence_radius:
-            return speed * displacement / self.convergence_radius
-        else:
-            return speed * displacement / distance
+        velocity =  speed * displacement / distance
 
 class NeuralNetVFields(VFields):
     def __init__(self):

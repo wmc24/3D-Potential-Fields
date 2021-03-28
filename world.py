@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import pygame as pg
 
-from geometry import Pose2D, Pose3D
+from geometry import Pose2D, Pose3D, Goal
 
 
 """ Helper functions for entity classes """
@@ -69,7 +69,7 @@ class Agent(Entity):
     def update(self, dt):
         self.pose.move_using_holonomic_point(self.velocity, self.max_speed, self.max_angular_speed, dt)
         self.pos = self.pose.pos
-        if self.goal is not None and np.linalg.norm(self.pos - self.goal) < 10: # TODO Use variable for this
+        if self.goal is not None and self.goal.reached(self.pose):
             self.goal = None
 
         self.log_timer += dt
@@ -124,10 +124,17 @@ class World:
         self.agents.append(Agent(pos, radius, max_speed, max_angular_speed, resource, self.log_size))
         self.resource_colors[resource] = color
 
-    def add_goal(self, pos, resource):
+    def add_goal(self, planet_i, resource):
         if not resource in self.resource_goals:
             self.resource_goals[resource] = []
-        self.resource_goals[resource].append(pos)
+        # Assume at this point, the only obstacles are planets
+        # Pick random position along planet circumference. Don't bother checking
+        # for goal collisions at the moment
+        angle = np.random.random()*2*np.pi
+        direction = np.array([np.cos(angle), np.sin(angle)])
+        planet = self.obstacles[planet_i]
+        pos = planet.pos + planet.radius*direction
+        self.resource_goals[resource].append(Goal(pos, -direction))
 
     def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
@@ -137,7 +144,7 @@ class World:
             if agent is None or agent != other_agent:
                 velocity += self.vfields.obstacle(pos, other_agent.pos, other_agent.radius, speed)
         if agent is not None and agent.goal is not None:
-            velocity += self.vfields.goal(pos, agent.goal, speed)
+            velocity += self.vfields.goal(pos, agent.goal.pos, agent.goal.direction, speed)
         return velocity
 
     def set_new_goal(self, agent):

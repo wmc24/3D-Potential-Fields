@@ -38,7 +38,7 @@ class Window:
         resource_goals = self.world.resource_goals[self.active_agent.resource]
         min_dist = None
         for i, goal in enumerate(resource_goals):
-            dist = np.linalg.norm(pos - goal)
+            dist = np.linalg.norm(pos - goal.pos)
             if dist < 100 and (min_dist is None or dist < min_dist):
                 min_dist = dist
                 self.active_agent.goal = goal
@@ -145,12 +145,12 @@ class Window:
                 pg.draw.circle(self.surface, self.world.resource_colors[agent.resource], pos, radius+5, 2)
 
             if agent.goal is not None:
-                goal_pos = self.camera.transform_position(agent.goal)
+                goal_pos = self.camera.transform_position(agent.goal.pos)
                 pg.draw.circle(self.surface, color, goal_pos, 12, 2)
 
         for resource, goals in self.world.resource_goals.items():
             for i, goal in enumerate(goals):
-                pos = self.camera.transform_position(goal)
+                pos = self.camera.transform_position(goal.pos)
                 color = self.world.resource_colors[resource]
                 size = 4
                 width = 2
@@ -198,7 +198,7 @@ class Window:
             plt.plot(log_poses[0,:], log_poses[1,:], color=color)
             if agent.goal is not None:
                 # Only plot active goals
-                plt.plot(agent.goal[0], agent.goal[1], color=color, marker="x")
+                plt.plot(agent.goal.pos[0], agent.goal.pos[1], color=color, marker="x")
 
         plt.axis('equal')
         plt.xlabel('x')
