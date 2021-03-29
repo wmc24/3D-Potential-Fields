@@ -53,6 +53,6 @@ class NeuralNetVFields(VFields):
     def __init__(self):
         pass
     def _obstacle(self, dist, radius):
-        pass
-    def goal(self, disp):
-        pass
+        return 0 # TODO
+    def _goal(self, disp):
+        return np.zeros(2) # TODO

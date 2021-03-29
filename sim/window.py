@@ -87,48 +87,49 @@ class Window:
         if self.active_agent is not None:
             speed = self.active_agent.max_speed
 
-        if self.paused:
-            N = 40
-            X, Y = np.meshgrid(np.linspace(0, self.width, N), np.linspace(0, self.height, N))
-            U = np.zeros_like(X)
-            V = np.zeros_like(Y)
-            for i, j in np.ndindex((N, N)):
-                screen_pos = np.array([X[i, j], Y[i, j]])
-                pos = self.camera.untransform_position(screen_pos)
-                velocity = self.world.get_velocity_field(pos, speed, self.active_agent)
-                U[i, j] = velocity[0]
-                V[i, j] = velocity[1]
+        N = 40
+        X, Y = np.meshgrid(np.linspace(0, self.width, N), np.linspace(0, self.height, N))
+        U = np.zeros_like(X)
+        V = np.zeros_like(Y)
+        for i, j in np.ndindex((N, N)):
+            screen_pos = np.array([X[i, j], Y[i, j]])
+            pos = self.camera.untransform_position(screen_pos)
+            velocity = self.world.get_velocity_field(pos, speed, self.active_agent)
+            U[i, j] = velocity[0]
+            V[i, j] = velocity[1]
 
-            mean_speed = np.sqrt(np.mean(U**2 + V**2))
+        mean_speed = np.sqrt(np.mean(U**2 + V**2))
+        if mean_speed == 0:
+            return
 
-            for i, j in np.ndindex((N, N)):
-                screen_pos = np.array([X[i, j], Y[i, j]])
-                velocity = np.array([U[i, j], V[i, j]])
-                line_speed = np.linalg.norm(velocity)
-                strength = 0.5 * line_speed / mean_speed
-                if strength > 1:
-                    strength = 1
+        for i, j in np.ndindex((N, N)):
+            screen_pos = np.array([X[i, j], Y[i, j]])
+            velocity = np.array([U[i, j], V[i, j]])
+            line_speed = np.linalg.norm(velocity)
+            strength = 0.5 * line_speed / mean_speed
+            if strength > 1:
+                strength = 1
 
-                line = self.camera.transform_direction(velocity)
-                line /= np.linalg.norm(line)
-                line_perp = np.array([-line[1], line[0]])
+            line = self.camera.transform_direction(velocity)
+            line /= np.linalg.norm(line)
+            line_perp = np.array([-line[1], line[0]])
 
-                color = (255*strength, 255*strength, 255*strength)
+            color = (255*strength, 255*strength, 255*strength)
 
-                lw = 1.0 # line width
-                ll = 20.0 # line length
-                lhw = 6.0 # Line head width
-                lhl = 6.0 # line head length
-                points = [
-                    screen_pos + line_perp*lw/2,
-                    screen_pos + line_perp*lw/2 + line*(ll-lhl),
-                    screen_pos + line_perp*lhw/2 + line*(ll-lhl),
-                    screen_pos + line*ll,
-                    screen_pos - line_perp*lhw/2 + line*(ll-lhl),
-                    screen_pos - line_perp*lw/2 + line*(ll-lhl),
-                    screen_pos - line_perp*lw/2,
-                ]
-                pg.draw.polygon(self.surface, color, points)
+            lw = 1.0 # line width
+            ll = 20.0 # line length
+            lhw = 6.0 # Line head width
+            lhl = 6.0 # line head length
+            points = [
+                screen_pos + line_perp*lw/2,
+                screen_pos + line_perp*lw/2 + line*(ll-lhl),
+                screen_pos + line_perp*lhw/2 + line*(ll-lhl),
+                screen_pos + line*ll,
+                screen_pos - line_perp*lhw/2 + line*(ll-lhl),
+                screen_pos - line_perp*lw/2 + line*(ll-lhl),
+                screen_pos - line_perp*lw/2,
+            ]
+            pg.draw.polygon(self.surface, color, points)
 
     def draw_entities(self):
         for resource, goals in self.world.resource_goals.items():
