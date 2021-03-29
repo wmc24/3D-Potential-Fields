@@ -4,6 +4,21 @@ import pygame as pg
 
 from .camera import Camera2D, Camera3D
 
+class DrawCommandLine:
+    def __init__(self, end, thickness):
+        self.end = end
+        self.thickness = thickness
+
+class DrawCommand:
+    def __init__(self, pos, radius, color, thickness=0):
+        self.pos = pos
+        self.radius = radius
+        self.color = color
+        self.thickness=thickness
+        self.lines = []
+    def add_line(self, end, thickness):
+        self.lines.append(DrawCommandLine(end, thickness))
+
 class Window:
     def __init__(self, title, width, height, world):
         pg.init()
@@ -14,10 +29,10 @@ class Window:
         self.world = world
 
         if self.world.N == 2:
-            self.camera = Camera2D(np.array([width, height]))
+            self.camera = Camera2D(np.array([width/2, height/2]))
             self.camera.scale = 2
         else:
-            self.camera = Camera3D(np.array([width, height]))
+            self.camera = Camera3D(np.array([width/2, height/2]))
 
         self.paused = False
         self.active_agent = None
@@ -84,7 +99,7 @@ class Window:
         return False
 
     def draw(self):
-        self.surface.fill("#000000", pg.Rect(0, 0, self.width, self.height))
+        self.surface.fill((0,0,0), pg.Rect(0, 0, self.width, self.height))
         if self.paused and self.world.N==2:
             self.draw_vfield()
         self.draw_world()
@@ -141,46 +156,61 @@ class Window:
             pg.draw.polygon(self.surface, color, points)
 
     def draw_world(self):
+        commands = []
         for resource, goals in self.world.resource_goals.items():
             for i, goal in enumerate(goals):
-                pos = self.camera.transform_position(goal.pos)
+                pos, radius = self.camera.transform_circle(goal.pos, goal.close_dist/2)
                 if pos is None: continue
-                direction = self.camera.transform_direction(goal.direction)
                 color = self.world.resource_colors[resource]
-                radius = self.camera.transform_size(goal.close_dist/2)
-                dir_length = self.camera.transform_size(100)
-                pg.draw.circle(self.surface, color, pos, radius)
-                pg.draw.line(self.surface, color,
-                    pos, pos+direction*dir_length, 2)
+                command = DrawCommand(pos, radius, color)
+
+                line_end = self.camera.transform_position(
+                    goal.pos+goal.direction*50)
+                if line_end is not None:
+                    command.add_line(line_end, 2)
+
+                commands.append(command)
 
         for obstacle in self.world.obstacles:
-            pos = self.camera.transform_position(obstacle.pos)
+            pos, radius = self.camera.transform_circle(obstacle.pos, obstacle.radius)
             if pos is None: continue
-            radius = self.camera.transform_size(obstacle.radius)
-            pg.draw.circle(self.surface, "#999999", pos, radius)
+            commands.append(DrawCommand(pos, radius, (100,100,100)))
 
         for agent in self.world.agents:
-            pos = self.camera.transform_position(agent.pos)
+            pos, radius = self.camera.transform_circle(agent.pos, agent.radius)
             if pos is None: continue
-            direction = self.camera.transform_direction(agent.pose.get_direction())
-            velocity_line = 0.1 * direction * np.linalg.norm(agent.velocity)
-
-            radius = self.camera.transform_size(agent.radius)
             color = self.world.resource_colors[agent.resource]
+            command = DrawCommand(pos, radius, color)
 
-            pg.draw.circle(self.surface, color, pos, radius)
-            pg.draw.line(self.surface, color, pos, pos + velocity_line)
+            line_end = agent.pos + agent.pose.get_direction() * 0.1 * np.linalg.norm(agent.velocity)
+            line_end = self.camera.transform_position(line_end)
+            if line_end is not None:
+                command.add_line(line_end, 2)
+
+            commands.append(command)
 
             if agent == self.active_agent:
-                outer_radius = self.camera.transform_size(agent.radius+10)
-                pg.draw.circle(self.surface, self.world.resource_colors[agent.resource], pos, outer_radius, 2)
+                pos, outer_radius = self.camera.transform_circle(agent.pos, agent.radius+10)
+                if pos is not None:
+                    commands.append(DrawCommand(pos, outer_radius, color, 2))
 
             if agent.goal is not None:
-                goal_pos = self.camera.transform_position(agent.goal.pos)
-                if goal_pos is None: continue
-                goal_direction = self.camera.transform_direction(agent.goal.direction)
-                close_radius = self.camera.transform_size(goal.close_dist)
-                pg.draw.circle(self.surface, color, goal_pos, close_radius, 2)
+                pos, radius = self.camera.transform_circle(agent.goal.pos, goal.close_dist)
+                if pos is None: continue
+                commands.append(DrawCommand(pos, radius, color, 2))
+
+        # If N==3, sort commands by z, and darken further colors
+        if self.world.N==3:
+            commands = sorted(commands, key=lambda x: x.pos[2], reverse=True)
+            for command in commands:
+                fade = np.exp(-command.pos[2] / 1500)
+                command.color = tuple([int(c*fade) for c in command.color])
+
+        for command in commands:
+            pg.draw.circle(self.surface, command.color, command.pos[0:2], command.radius, command.thickness)
+            for line in command.lines:
+                pg.draw.line(self.surface, command.color, command.pos[0:2], line.end[0:2], line.thickness)
+
 
     def draw_hud(self):
         x = 20

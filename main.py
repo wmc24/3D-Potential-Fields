@@ -51,9 +51,9 @@ def create_2d_world(vfields):
 def create_3d_world(vfields):
     world = World(N=3, width=2000, vfields=vfields)
 
-    world.add_planet(np.array([-300, -300, 100], dtype=np.float32), 100)
+    world.add_planet(np.array([-300, -300, 0], dtype=np.float32), 100)
     world.add_planet(np.array([0, 200, 0], dtype=np.float32), 80)
-    world.add_planet(np.array([400, -100, -100], dtype=np.float32), 80)
+    world.add_planet(np.array([400, -100, 0], dtype=np.float32), 80)
 
     world.add_agent(
         pos = np.array([100, 0, 0], dtype=np.float32),
@@ -61,21 +61,21 @@ def create_3d_world(vfields):
         max_speed = 2000,
         max_angular_speed = 2,
         resource = "FUEL",
-        color = "#ff0000")
+        color = (255,0,0))
     world.add_agent(
         pos = np.array([0, 0, 0], dtype=np.float32),
         radius = 15,
         max_speed = 4000,
         max_angular_speed = 4,
         resource = "METALS",
-        color = "#00ff00")
+        color = (0,255,0))
     world.add_agent(
         pos = np.array([-100, 0, 0], dtype=np.float32),
         radius = 12,
         max_speed = 5000,
         max_angular_speed = 6,
         resource = "WATER",
-        color = "#0000ff")
+        color = (0,0,255))
 
     world.add_goal(0, "FUEL")
     world.add_goal(0, "METALS")
