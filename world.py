@@ -5,17 +5,8 @@ import pygame as pg
 from geometry import Pose2D, Pose3D, Goal
 
 
-""" Helper functions for entity classes """
-
 def entities_collide(entity1, entity2):
     return (np.linalg.norm(entity1.pos - entity2.pos) <= entity1.radius + entity2.radius)
-
-def obstacle_outside_bounds(obstacle, size):
-    if obstacle.pos[0] < -obstacle.radius and obstacle.velocity[0] < 0: return True
-    if obstacle.pos[0] > size[0]+obstacle.radius and obstacle.velocity[0] > 0: return True
-    if obstacle.pos[1] < -obstacle.radius and obstacle.velocity[1] < 0: return True
-    if obstacle.pos[1] < size[1]+obstacle.radius and obstacle.velocity[1] > 0: return True
-    return False
 
 
 class Entity(object):
@@ -108,7 +99,9 @@ class World:
         self.vfields = vfields
         self.agents = []
         self.obstacles = []
-        self.meteoroid_spawn_rate = 5
+        self.meteoroid_spawn_rate = 1
+        self.meteoroid_spawn_timer = 0
+        self.set_meteoroid_spawn_time()
         self.log_size = log_size
         self.resource_colors = {}
         self.resource_goals = {}
@@ -163,7 +156,24 @@ class World:
         agent.goal = resources[indexes[i]]
         agent.last_goal_i = indexes[i]
 
+    def set_meteoroid_spawn_time(self):
+        self.meteoroid_spawn_time = -np.log(np.random.random())/self.meteoroid_spawn_rate
+
+    def spawn_meteoroid(self):
+        radius = 20 + np.random.random()*20
+        # TODO:
+        # pos, direction = self.get_random_meteoroid_trajectory()
+        speed = 500 + np.random.random()*1500
+        # self.obstacles.append(Obstacle(pos, radius, speed*direction, True))
+
     def update(self, dt):
+        # Randomly spawn meteoroids
+        self.meteoroid_spawn_timer += dt
+        if self.meteoroid_spawn_timer > self.meteoroid_spawn_time:
+            self.spawn_meteoroid()
+            self.meteoroid_spawn_timer = 0
+            self.set_meteoroid_spawn_time()
+
         for agent in self.agents:
             if agent.goal is None:
                 self.set_new_goal(agent)
@@ -177,8 +187,9 @@ class World:
         # Now remove destructable obstacles in a collision state or
         # outside the arena (and moving out the arena)
         for i in range(len(self.obstacles)):
-            if obstacle_outside_bounds(self.obstacles[i], self.size):
-                self.obstacles[i].set_remove_flag()
+            # TODO
+            # if obstacle_outside_bounds(self.obstacles[i], self.size):
+            #     self.obstacles[i].set_remove_flag()
             for j in range(i+1, len(self.obstacles)):
                 if entities_collide(self.obstacles[i], self.obstacles[j]):
                     self.obstacles[i].set_remove_flag()

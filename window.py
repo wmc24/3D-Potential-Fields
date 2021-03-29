@@ -14,13 +14,18 @@ class Window:
         self.world = world
 
         if self.world.N == 2:
-            self.camera = Camera2D(np.array([width/2, height/2]))
+            self.camera = Camera2D(np.array([width, height]))
             self.camera.scale = 2
         else:
-            sef.camera = Camera3D(np.array([width/2, height/2]))
+            sef.camera = Camera3D(np.array([width, height]))
 
         self.paused = False
         self.active_agent = None
+
+        font = pg.font.SysFont(None, 24)
+        self.resource_names = []
+        for resource, color in self.world.resource_colors.items():
+            self.resource_names.append(font.render(resource, True, color))
 
     def set_active_agent(self, mouse_pos):
         pos = self.camera.untransform_position(np.array(mouse_pos))
@@ -74,6 +79,7 @@ class Window:
         if self.paused:
             self.draw_vfield()
         self.draw_entities()
+        self.draw_hud()
         pg.display.update()
 
     def draw_vfield(self):
@@ -161,6 +167,12 @@ class Window:
                 goal_direction = self.camera.transform_direction(agent.goal.direction)
                 close_radius = self.camera.transform_size(goal.close_dist)
                 pg.draw.circle(self.surface, color, goal_pos, close_radius, 2)
+
+    def draw_hud(self):
+        x = 20
+        for name_img in self.resource_names:
+            self.surface.blit(name_img, (x, 20))
+            x += 20 + name_img.get_width()
 
     def plot(self):
         if len(self.world.size) != 2:

@@ -22,34 +22,34 @@ def main():
     world.add_agent(
         pos = np.array([100, 0], dtype=np.float32),
         radius = 20,
-        max_speed = 3000,
+        max_speed = 2000,
         max_angular_speed = 2,
-        resource = "A",
+        resource = "FUEL",
         color = "#ff0000")
     world.add_agent(
         pos = np.array([0, 0], dtype=np.float32),
         radius = 15,
-        max_speed = 5000,
+        max_speed = 4000,
         max_angular_speed = 4,
-        resource = "B",
+        resource = "METALS",
         color = "#00ff00")
     world.add_agent(
         pos = np.array([-100, 0], dtype=np.float32),
         radius = 12,
-        max_speed = 7000,
+        max_speed = 5000,
         max_angular_speed = 6,
-        resource = "C",
+        resource = "WATER",
         color = "#0000ff")
 
-    world.add_goal(0, "A")
-    world.add_goal(0, "B")
-    world.add_goal(0, "C")
-    world.add_goal(1, "A")
-    world.add_goal(1, "B")
-    world.add_goal(1, "C")
-    world.add_goal(2, "A")
-    world.add_goal(2, "B")
-    world.add_goal(2, "C")
+    world.add_goal(0, "FUEL")
+    world.add_goal(0, "METALS")
+    world.add_goal(0, "WATER")
+    world.add_goal(1, "FUEL")
+    world.add_goal(1, "METALS")
+    world.add_goal(1, "WATER")
+    world.add_goal(2, "FUEL")
+    world.add_goal(2, "METALS")
+    world.add_goal(2, "WATER")
 
     window = Window("Spaceships", 1200, 800, world)
 
