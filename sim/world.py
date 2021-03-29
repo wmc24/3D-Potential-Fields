@@ -9,37 +9,27 @@ def entities_collide(entity1, entity2):
     return (np.linalg.norm(entity1.pos - entity2.pos) <= entity1.radius + entity2.radius)
 
 def get_random_meteoroid_trajectory(size, padding=0):
-    side = np.random.randint(4)
-    loc = np.random.random()
-    angle = -0.5+np.random.random()
-    angle += side*np.pi/2
-    direction = np.array([np.cos(angle), np.sin(angle)])
-    size = size.astype(np.float32)
-    if side == 0:
-        pos = -size/2
-        pos[1] += loc * size[1]
-        pos[0] -= padding
-    elif side == 1:
-        pos = -size/2
-        pos[0] += loc * size[0]
-        pos[1] -= padding
-    elif side == 2:
-        pos = size/2
-        pos[1] -= loc * size[1]
-        pos[0] += padding
-    elif side == 3:
-        pos = size/2
-        pos[0] -= loc * size[0]
-        pos[1] += padding
+    N = len(size)
+    direction = np.zeros(N)
+    side = np.random.randint(N)
+    sign = -1 if np.random.randint(2)==0 else 1
+    direction[side] = sign
+    pos = 0.5*direction*size[side]
+    for i in range(N):
+        if i==side: continue
+        pos[i] += (-0.5+np.random.random())*size[i] + sign*padding
+    direction = -direction
+    for i in range(N):
+        if i==side: continue
+        angle = -0.5+np.random.random() # About -30 -> 30 degrees
+        direction[i] = np.sin(angle)
     return pos, direction
 
 def obstacle_outside_bounds(pos, vel, size, padding=0):
-    if pos[0] < -size[0]/2-padding and vel[0] < 0: return True
-    if pos[0] > size[0]/2+padding and vel[0] > 0: return True
-    if pos[1] < -size[1]/2-padding and vel[1] < 0: return True
-    if pos[1] > size[1]/2+padding and vel[1] > 0: return True
+    for i in range(len(size)):
+        if pos[i] < -size[i]/2-padding and vel[i] < 0: return True
+        if pos[i] > size[i]/2+padding and vel[i] > 0: return True
     return False
-
 
 class Entity(object):
     def __init__(self, pos, radius):
@@ -159,11 +149,11 @@ class World:
         direction = np.array([np.cos(angle), np.sin(angle)])
         planet = self.obstacles[planet_i]
         if self.N==3:
-            vert_angle = np.random.random()*np.pi
+            vert_angle = (-0.5+np.random.random())*np.pi
             direction *= np.cos(vert_angle)
             direction = np.array([direction[0], direction[1], np.sin(vert_angle)])
 
-        pos = planet.pos + 1.8*planet.radius*direction
+        pos = planet.pos + (planet.radius+40)*direction
         self.resource_goals[resource].append(Goal(pos, -direction))
 
     def get_velocity_field(self, pos, speed, agent=None):

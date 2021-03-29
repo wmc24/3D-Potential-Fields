@@ -2,9 +2,8 @@ import numpy as np
 import pygame as pg
 
 class Camera2D:
-    def __init__(self, screen_size):
-        self.screen_centre = screen_size/2
-        self.screen_size = screen_size
+    def __init__(self, screen_centre):
+        self.screen_centre = screen_centre
         self.pos = np.zeros(2, dtype=np.float32)
         self.scale = 1
         self.R = np.eye(2)
@@ -36,27 +35,21 @@ class Camera2D:
         screen_pos[1] = -screen_pos[1]
         return self.screen_centre + screen_pos
 
+    def transform_circle(self, pos, radius):
+        return self.transform_position(pos), radius/self.scale
+
+    # Only used for plotting vfields
     def transform_direction(self, direction):
         screen_direction = np.matmul(self.R.transpose(), direction)
         screen_direction[1] = -screen_direction[1]
         return screen_direction
 
-    def transform_size(self, size):
-        return size/self.scale
-
+    # For placing mouse position on world
     def untransform_position(self, screen_pos):
         screen_pos = np.array(screen_pos)
         screen_pos -= self.screen_centre
         screen_pos[1] = -screen_pos[1]
         return self.pos + np.matmul(self.R, screen_pos)*self.scale
-
-    def untransform_direction(self, screen_direction):
-        screen_direction = np.array(screen_direction)
-        screen_direction[1] = -screen_direction[1]
-        return np.matmul(self.R, screen_direction)
-
-    def untransform_size(self, size):
-        return size*self.scale
 
     def set_key(self, key, value):
         if key in self.keys:
@@ -64,8 +57,8 @@ class Camera2D:
 
 
 class Camera3D(object):
-    def __init__(self, screen_centre, focal_length=10, clipping_dist=10):
-        self.screen_centre = screen_centre
+    def __init__(self, screen_centre, focal_length=500, clipping_dist=5):
+        self.screen_centre = np.concatenate([screen_centre, [0]])
         self.focal_length = focal_length
         self.clipping_dist = clipping_dist
         self.pos = np.zeros(3, dtype=np.float32)
@@ -103,37 +96,39 @@ class Camera3D(object):
         # Only control yaw, don't bother with pitch
 
     def update(self, dt):
-        self.velocity[0] = self.scale*self.speed*(self.keys[pg.K_w] - self.keys[pg.K_s])
-        self.velocity[1] = self.scale*self.speed*(self.keys[pg.K_d] - self.keys[pg.K_a])
-        self.velocity[2] = self.scale*self.speed*(self.keys[pg.K_SPACE] - self.keys[pg.K_LSHIFT])
+        self.velocity[2] = -self.scale*self.speed*(self.keys[pg.K_w] - self.keys[pg.K_s])
+        self.velocity[0] = self.scale*self.speed*(self.keys[pg.K_d] - self.keys[pg.K_a])
+        self.velocity[1] = self.scale*self.speed*(self.keys[pg.K_SPACE] - self.keys[pg.K_LSHIFT])
 
         self.pos += np.matmul(self.R, self.velocity)*dt
 
-        self.angle += self.rotate_speed*(self.keys[pg.K_q] - self.keys[pg.K_e])
+        self.angle += dt*self.rotate_speed*(self.keys[pg.K_q] - self.keys[pg.K_e])
         self.update_R()
 
         self.zoom_velocity = -self.zoom_speed*(self.keys[pg.K_EQUALS] - self.keys[pg.K_MINUS])
         self.scale = np.exp(np.log(self.scale) + self.zoom_velocity*dt)
 
     def transform_position(self, pos):
-        pos_3d = np.matmul(self.R, pos-self.pos)/self.scale
-        # Only draw for z < -clipping_dist
-        if pos_3d[2] > -self.clipping_dist: return None
-        pos_3d *= self.focal_length / pos_3d[2]
-        return self.screen_centre + pos_3d[0:2]
+        pos_3d = np.matmul(self.R.transpose(), pos-self.pos)/self.scale
+        z = pos_3d[2]
+        if z > -self.clipping_dist: return None
+        # Allow pos_3d[2] to be used for depth
+        pos_3d[0:2] *= self.focal_length / abs(z)
+        pos_3d[2] = abs(z)
+        pos_3d[1] = -pos_3d[1]
+        return self.screen_centre + pos_3d
 
-    def transform_direction(self, direction):
-        screen_direction = np.matmul(self.R, direction)
-        return screen_direction[0:2]
-
-    def transform_size(self, size):
-        return size/self.scale
+    def transform_circle(self, pos, radius):
+        screen_pos = self.transform_position(pos)
+        if screen_pos is None: return None, None
+        return screen_pos, (radius/self.scale) * self.focal_length/screen_pos[2]
 
     def project_position(self, pos):
         pos_3d = np.array([pos[0], pos[1], -self.focal_length])
         direction = pos_3d / np.linalg.norm(pos_3d)
         pos_3d = self.pos + np.matmul(self.R, pos_3d)*self.scale
         direction = np.matmul(self.R, direction)
+        direction[1] = -direction[1]
         return pos_3d, direction
 
     def set_key(self, key, value):
