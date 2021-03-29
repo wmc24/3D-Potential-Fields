@@ -7,85 +7,71 @@ from sim import World
 from sim import Window
 from plotting import plot_world
 
-def create_2d_world(vfields):
-    world = World(N=2, width=2000, vfields=vfields)
 
-    world.add_planet(np.array([-300, -300], dtype=np.float32), 100)
-    world.add_planet(np.array([0, 200], dtype=np.float32), 80)
-    world.add_planet(np.array([400, -100], dtype=np.float32), 80)
+class WorldConfig:
+    def __init__(self, N=2):
+        self.N = N
+        self.width = 2000
+        self.max_speed = 2000
+        self.max_angular_speed = 3
+        self.agent_radius = 20
+        self.planet_radii_range = (60, 200) # Not enforced at the moment
+        self.meteoroid_radii_range = (30, 80) # Not enforced ..
+        self.meteoroid_speed_range = (3000, 5000) # Not enforced ..
+        self.resources = ["Oil", "Iron", "Water", "Copper", "Hydrogen", "Silicon"]
+        # pygame can use "#rgb" or (r,g,b)
+        # Plotting needs "#rgb", only done for 2D
+        # 3D rendering needs (r,g,b)
+        # Therefore, use "#rgb" for 2D, (r,g,b) for 3D, as a quick fix
+        self.resource_colors_2d = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff"]
+        self.resource_colors_3d = [(255,0,0), (0,255,0), (0,0,255), (255,255,0), (0,255,255), (255,0,255)]
 
-    world.add_agent(
-        pos = np.array([100, 0], dtype=np.float32),
-        radius = 20,
-        max_speed = 2000,
-        max_angular_speed = 2,
-        resource = "FUEL",
-        color = "#ff0000")
-    world.add_agent(
-        pos = np.array([0, 0], dtype=np.float32),
-        radius = 15,
-        max_speed = 4000,
-        max_angular_speed = 4,
-        resource = "METALS",
-        color = "#00ff00")
-    world.add_agent(
-        pos = np.array([-100, 0], dtype=np.float32),
-        radius = 12,
-        max_speed = 5000,
-        max_angular_speed = 6,
-        resource = "WATER",
-        color = "#0000ff")
+    def resource_color(self, i):
+        if self.N==2:
+            return self.resource_colors_2d[i]
+        else:
+            return self.resource_colors_3d[i]
 
-    world.add_goal(0, "FUEL")
-    world.add_goal(0, "METALS")
-    world.add_goal(0, "WATER")
-    world.add_goal(1, "FUEL")
-    world.add_goal(1, "METALS")
-    world.add_goal(1, "WATER")
-    world.add_goal(2, "FUEL")
-    world.add_goal(2, "METALS")
-    world.add_goal(2, "WATER")
 
-    return world
+def create_agents(world, config):
+    # Simply spawn in a line at the origin
+    x = 0
+    for i in range(len(config.resources)):
+        pos = np.zeros(world.N)
+        pos[0] = x
+        x += config.agent_radius*4
+        world.add_agent(
+            pos=pos,
+            radius=config.agent_radius,
+            max_speed=config.max_speed,
+            max_angular_speed=config.max_angular_speed,
+            resource=config.resources[i],
+            color=config.resource_color(i))
 
-def create_3d_world(vfields):
-    world = World(N=3, width=2000, vfields=vfields)
+def create_goals(world, config, num_planets):
+    for i in range(num_planets):
+        for resource in config.resources:
+            world.add_goal(i, resource)
 
-    world.add_planet(np.array([-300, -300, 0], dtype=np.float32), 100)
-    world.add_planet(np.array([0, 200, 0], dtype=np.float32), 80)
-    world.add_planet(np.array([400, -100, 0], dtype=np.float32), 80)
+def create_world(vfields, config):
+    world = World(N=config.N, width=config.width, vfields=vfields)
 
-    world.add_agent(
-        pos = np.array([100, 0, 0], dtype=np.float32),
-        radius = 20,
-        max_speed = 2000,
-        max_angular_speed = 2,
-        resource = "FUEL",
-        color = (255,0,0))
-    world.add_agent(
-        pos = np.array([0, 0, 0], dtype=np.float32),
-        radius = 15,
-        max_speed = 4000,
-        max_angular_speed = 4,
-        resource = "METALS",
-        color = (0,255,0))
-    world.add_agent(
-        pos = np.array([-100, 0, 0], dtype=np.float32),
-        radius = 12,
-        max_speed = 5000,
-        max_angular_speed = 6,
-        resource = "WATER",
-        color = (0,0,255))
+    if config.N==2:
+        world.add_planet(np.array([-300, -300], dtype=np.float32), 100)
+        world.add_planet(np.array([0, 200], dtype=np.float32), 80)
+        world.add_planet(np.array([400, -100], dtype=np.float32), 80)
+        num_planets = 3
+    else:
+        world.add_planet(np.array([-300, -300, 0], dtype=np.float32), 100)
+        world.add_planet(np.array([-120, 500, 0], dtype=np.float32), 80)
+        world.add_planet(np.array([600, -100, 0], dtype=np.float32), 80)
+        world.add_planet(np.array([50, 10, -300], dtype=np.float32), 50)
+        world.add_planet(np.array([50, -120, 250], dtype=np.float32), 100)
+        world.add_planet(np.array([-600, 200, 100], dtype=np.float32), 180)
+        num_planets = 6
 
-    world.add_goal(0, "FUEL")
-    world.add_goal(0, "METALS")
-    world.add_goal(0, "WATER")
-    world.add_goal(1, "FUEL")
-    world.add_goal(1, "METALS")
-    world.add_goal(1, "WATER")
-    world.add_goal(2, "FUEL")
-    world.add_goal(2, "METALS")
-    world.add_goal(2, "WATER")
+    create_agents(world, config)
+    create_goals(world, config, num_planets)
 
     return world
 
@@ -98,20 +84,19 @@ def main():
 
     args, unknown = parser.parse_known_args()
 
+    config = WorldConfig(args.N)
+
     if args.vfields == "analytical":
         vfields = AnalyticalVFields(
             decay_radius=20,
-            convergence_radius=10,
+            convergence_radius=20,
             obstacle_scale=5,
             alpha=10
         )
     else:
         vfields = NeuralNetVFields() # TODO
 
-    if args.N == 2:
-        world = create_2d_world(vfields)
-    else:
-        world = create_3d_world(vfields)
+    world = create_world(vfields, config)
 
     if args.T == 0:
         window = Window("Spaceships", 1200, 800, world)

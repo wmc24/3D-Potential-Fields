@@ -42,6 +42,10 @@ class Window:
         for resource, color in self.world.resource_colors.items():
             self.resource_names.append(font.render(resource, True, color))
 
+        self.meteoroid_enable_imgs = []
+        self.meteoroid_enable_imgs.append(font.render("Meteoroids: Disabled", True, "#aaaaaa"))
+        self.meteoroid_enable_imgs.append(font.render("Meteoroids: Enabled", True, "#aaaaaa"))
+
     def get_mouse_dist_function(self, mouse_pos):
         if self.world.N == 2:
             pos = self.camera.untransform_position(np.array(mouse_pos))
@@ -67,8 +71,8 @@ class Window:
         min_dist = None
         dist_f = self.get_mouse_dist_function(mouse_pos)
         for i, goal in enumerate(resource_goals):
-            dist = dist_f(goal)
-            if dist < 100 and (min_dist is None or dist < min_dist):
+            dist = dist_f(goal.pos)
+            if dist < 400 and (min_dist is None or dist < min_dist):
                 min_dist = dist
                 self.active_agent.goal = goal
                 self.active_agent.last_goal_i = i
@@ -82,6 +86,8 @@ class Window:
                     return True
                 elif event.key == pg.K_p:
                     self.paused = not self.paused
+                elif event.key == pg.K_o:
+                    self.world.meteoroid_enable = not self.world.meteoroid_enable
                 else:
                     self.camera.set_key(event.key, 1)
             if event.type == pg.KEYUP:
@@ -182,7 +188,7 @@ class Window:
             color = self.world.resource_colors[agent.resource]
             command = DrawCommand(pos, radius, color)
 
-            line_end = agent.pos + agent.pose.get_direction() * 0.1 * np.linalg.norm(agent.velocity)
+            line_end = agent.pos + agent.pose.get_direction() * 0.3 * np.linalg.norm(agent.velocity)
             line_end = self.camera.transform_position(line_end)
             if line_end is not None:
                 command.add_line(line_end, 2)
@@ -203,7 +209,7 @@ class Window:
         if self.world.N==3:
             commands = sorted(commands, key=lambda x: x.pos[2], reverse=True)
             for command in commands:
-                fade = np.exp(-command.pos[2] / 1500)
+                fade = np.exp(-command.pos[2] / 1000)
                 command.color = tuple([int(c*fade) for c in command.color])
 
         for command in commands:
@@ -217,4 +223,5 @@ class Window:
         for name_img in self.resource_names:
             self.surface.blit(name_img, (x, 20))
             x += 20 + name_img.get_width()
-
+        met_img = self.meteoroid_enable_imgs[self.world.meteoroid_enable]
+        self.surface.blit(met_img, (self.width-20-met_img.get_width(), 20))
