@@ -2,7 +2,7 @@ import matplotlib.pylab as plt
 import numpy as np
 import pygame as pg
 
-from camera import Camera2D, Camera3D
+from .camera import Camera2D, Camera3D
 
 class Window:
     def __init__(self, title, width, height, world):

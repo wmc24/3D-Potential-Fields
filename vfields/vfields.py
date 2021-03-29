@@ -39,12 +39,12 @@ class AnalyticalVFields(VFields):
             return 0
 
     def _goal(self, disp):
-        # Potential = |x| + alpha*tan(theta)**2
         dist = np.linalg.norm(disp)
         if dist < self.convergence_radius:
             velocity = -disp / self.convergence_radius
         else:
             velocity = -disp / dist
+        # The below penalises tan(theta)**2, to drive to theta=0.
         # velocity += self.alpha * (disp[0]/disp[1]**3)*np.array([disp[1], -disp[0]])
         return velocity
 

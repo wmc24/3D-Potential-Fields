@@ -2,8 +2,8 @@ import numpy as np
 import pygame as pg
 
 from vfields import AnalyticalVFields
-from world import World
-from window import Window
+from sim import World
+from sim import Window
 
 def main():
     vfields = AnalyticalVFields(

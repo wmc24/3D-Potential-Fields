@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pylab as plt
 import pygame as pg
 
-from geometry import Pose2D, Pose3D, Goal
+from .geometry import Pose2D, Pose3D, Goal
 
 
 def entities_collide(entity1, entity2):
