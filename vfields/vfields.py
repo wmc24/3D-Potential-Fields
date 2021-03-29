@@ -1,3 +1,6 @@
+import os
+import torch
+import myModel
 import numpy as np
 
 class VFields(object):
@@ -51,7 +54,12 @@ class AnalyticalVFields(VFields):
 
 class NeuralNetVFields(VFields):
     def __init__(self):
-        pass
+        #loading the network and its weights
+        self.loaded_model_name = 'Goal-Potential'
+        self.model = myModel.Net()
+        checkpoint = torch.load(os.path.join('models', f'{self.loaded_model_name}.tar'))
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+
     def _obstacle(self, dist, radius):
         return 0 # TODO
     def _goal(self, disp):
