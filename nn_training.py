@@ -3,10 +3,10 @@ import sys
 import torch
 import myModel
 import datetime
-import potential_field
 import numpy as np
 import torch.nn as nn
 from tqdm import tqdm as tqdm
+from vfields import AnalyticalVFields
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset as BaseDataset
@@ -29,7 +29,7 @@ perform_training = True
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
-num_epochs = None
+num_epochs = 1
 learning_rate = 1e-5
 batch_size = 10
 batch_size_doubling_epochs = [100000, 250000, 1000000, 10000000]
@@ -72,7 +72,7 @@ print("Device Used:", DEVICE)
 
 
 # Loading a network
-model = myModel.BasicGoalNet()
+model = myModel.Net()
 
 if load_model is True:
     # Loading the model weights
@@ -104,8 +104,8 @@ class Dataset(BaseDataset):
     for it. We return the following using relative coordinates:
     
     goal_position - numpy array (dims)
-    planet_positions - numpy array (N, dims)
-    planet_radii - numpy array (N, 1)
+    planets_position - numpy array (N, dims)
+    planets_radii - numpy array (N, 1)
     spaceships - numpy array (N, dims*2)
     meteoroids - numpy array (N, dims*2)
     """
@@ -115,23 +115,32 @@ class Dataset(BaseDataset):
             planets_pot=False,
             spaceships_pot=False,
             meteoroids_pot=False,
-            size_of_universe=10,
-            dims=2
+            size_of_universe=2000,
+            dims=2,
+            decay_radius=20,
+            convergence_radius=10,
+            obstacle_scale=5,
+            alpha=10
     ):
         self.planets_pot = planets_pot
         self.spaceships_pot = spaceships_pot
         self.meteoroids_pot = meteoroids_pot
         self.size_of_universe = size_of_universe
         self.dims = 2
+        self.vfields = AnalyticalVFields(decay_radius,
+                                         convergence_radius,
+                                         obstacle_scale,
+                                         alpha)
 
     def __getitem__(self, i):
-        # Set the position as the centre as the net expects
-        # relative coordinates
-        position = np.array([0, 0, 0])
-
-        # Generating a random goal position using a uniform distribution and its associated velocity
+        # We use relative coordinates throughout
+        # Generating a random goal position (relative) using a uniform distribution and its associated velocity
         goal_position = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=3)
-        goal_velocity = potential_field.get_velocity_to_reach_goal(position, goal_position, self.dims)
+        goal_velocity = self.vfields.goal(goal_position)
+        # NEED TO RANDOMLY PASS AN EMPTY NUMPY ARRAY FOR POSITION
+
+        # INSERT GENERATION FOR planets
+        planets_velocity = np.random.uniform(-1, 1, size=3) #TEMPORARY
 
         # Defining the rest of the environment NEED TO MODIFY IN FUTURE
         planet_positions = []
@@ -140,7 +149,7 @@ class Dataset(BaseDataset):
         meteoroids = []
 
         # Reshaping to the desired shapes and converting to numpy arrays
-        goal_position = np.array(goal_position)
+        goal_position = np.array(goal_position).reshape((-1, self.dims))
         planet_positions = np.array(planet_positions).reshape((-1, self.dims))
         planet_radii = np.array(planet_radii).reshape((-1, 1))
         spaceships = np.array(spaceships).reshape((-1, self.dims*2))
@@ -149,7 +158,7 @@ class Dataset(BaseDataset):
         # Getting the velocity array
         velocity = goal_velocity
 
-        return goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity
+        return goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity, planets_velocity, spaceships_velocity, meteoriods_velocity
         
     def __len__(self):
         return batch_size
@@ -173,21 +182,13 @@ if perform_training is True:
         i = epoch + 1
         while True:
             # Perfoming training
-
-            for index, (goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity) in enumerate(dataloader):
-                #goal_position = goal_position.to(DEVICE).float()
-                #planet_positions = planet_positions.to(DEVICE).float()
-                #planet_radii = planet_radii.to(DEVICE).float()
-                #spaceships = spaceships.to(DEVICE).float()
-                #meteoroids = meteoroids.to(DEVICE).float()
-                #velocity = velocity.to(DEVICE).float()
-
+            for index, (goal_position, planet_positions, planet_radii, spaceships, meteoroids, velocity, goal_velocity, planets_velocity, spaceships_velocity, meteoriods_velocity) in enumerate(dataloader):
                 optimizer.zero_grad()
-                prediction, goal_prediction = model.forward(goal_position.to(DEVICE).float(), 
-                                                            planet_positions.to(DEVICE).float(), 
-                                                            planet_radii.to(DEVICE).float(), 
-                                                            spaceships.to(DEVICE).float(), 
-                                                            meteoroids.to(DEVICE).float())
+                prediction, goal_prediction, planets_prediction, spaceships_prediction, meteoroids_prediction = model.forward(goal_position.to(DEVICE).float(), 
+                                                                                                                              planet_positions.to(DEVICE).float(), 
+                                                                                                                              planet_radii.to(DEVICE).float(), 
+                                                                                                                              spaceships.to(DEVICE).float(), 
+                                                                                                                              meteoroids.to(DEVICE).float())
                 total_loss = loss(prediction, velocity.to(DEVICE).float())
                 total_loss.backward()
                 optimizer.step()
@@ -197,8 +198,12 @@ if perform_training is True:
                 print('\nEpoch: {}'.format(i))
                 prediction = prediction.cpu().detach().numpy()
                 goal_prediction = goal_prediction.cpu().detach().numpy()
+                planets_prediction = planets_prediction.cpu().detach().numpy()
+                spaceships_prediction = spaceships_prediction.cpu().detach().numpy()
+                meteoroids_prediction = meteoroids_prediction.cpu().detach().numpy()
                 velocity = velocity.numpy()
                 goal_velocity = goal_velocity.numpy()
+                planets_velocity = planets_velocity.numpy()
                 writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
                 writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
                                 {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
@@ -216,7 +221,31 @@ if perform_training is True:
                                 'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
                                 'z - median': np.median(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2]))},
                                 global_step=i)
-                writer.add_scalar(f'{tensorboard_name}/4 - Batch Size', batch_size, global_step=i)
+                writer.add_scalars(f'{tensorboard_name}/4 - Absolute Planets Velocity Errors (m/s)',
+                                {'x - mean': np.mean(np.abs(planets_velocity[:, 0] - planets_prediction[:, 0])),
+                                'y - mean': np.mean(np.abs(planets_velocity[:, 1] - planets_prediction[:, 1])),
+                                'z - mean': np.mean(np.abs(planets_velocity[:, 2] - planets_prediction[:, 2])),
+                                'x - median': np.median(np.abs(planets_velocity[:, 0] - planets_prediction[:, 0])),
+                                'y - median': np.median(np.abs(planets_velocity[:, 1] - planets_prediction[:, 1])),
+                                'z - median': np.median(np.abs(planets_velocity[:, 2] - planets_prediction[:, 2]))},
+                                global_step=i)
+                writer.add_scalars(f'{tensorboard_name}/5 - Absolute Spaceships Velocity Errors (m/s)',
+                                {'x - mean': np.mean(np.abs(spaceships_velocity[:, 0] - spaceships_prediction[:, 0])),
+                                'y - mean': np.mean(np.abs(spaceships_velocity[:, 1] - spaceships_prediction[:, 1])),
+                                'z - mean': np.mean(np.abs(spaceships_velocity[:, 2] - spaceships_prediction[:, 2])),
+                                'x - median': np.median(np.abs(spaceships_velocity[:, 0] - spaceships_prediction[:, 0])),
+                                'y - median': np.median(np.abs(spaceships_velocity[:, 1] - spaceships_prediction[:, 1])),
+                                'z - median': np.median(np.abs(spaceships_velocity[:, 2] - spaceships_prediction[:, 2]))},
+                                global_step=i)
+                writer.add_scalars(f'{tensorboard_name}/6 - Absolute Meteorites Velocity Errors (m/s)',
+                                {'x - mean': np.mean(np.abs(meteoriods_velocity[:, 0] - meteoroids_prediction[:, 0])),
+                                'y - mean': np.mean(np.abs(meteoriods_velocity[:, 1] - meteoroids_prediction[:, 1])),
+                                'z - mean': np.mean(np.abs(meteoriods_velocity[:, 2] - meteoroids_prediction[:, 2])),
+                                'x - median': np.median(np.abs(meteoriods_velocity[:, 0] - meteoroids_prediction[:, 0])),
+                                'y - median': np.median(np.abs(meteoriods_velocity[:, 1] - meteoroids_prediction[:, 1])),
+                                'z - median': np.median(np.abs(meteoriods_velocity[:, 2] - meteoroids_prediction[:, 2]))},
+                                global_step=i)
+                writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
             
             # Doubling the batch size at fixed epochs
             if i in batch_size_doubling_epochs:
