@@ -32,7 +32,7 @@ perform_training = True
 num_epochs = None
 learning_rate = 1e-5
 batch_size = 10
-batch_size_doubling_epochs = [100000, 250000, 1000000]
+batch_size_doubling_epochs = [100000, 250000, 1000000, 10000000]
 
 # How many epochs to save things
 model_epochs = 1000
@@ -258,3 +258,6 @@ if perform_training is True:
                       'optimizer_state_dict': optimizer.state_dict()}
         torch.save(model_data, save_dir)
         print('Model saved!')
+
+if perform_training is True:
+    writer.flush()
