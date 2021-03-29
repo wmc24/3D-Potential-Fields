@@ -11,3 +11,4 @@ the velocity vectors of the potential field locally for each agent.
 
 # References Used
 Number of planets in a planetary system - 1 to 2 (so use 3 including the star) - https://www.sciencefocus.com/space/on-average-how-many-planets-are-in-orbit-around-each-star/
+Increasing Batch size - https://arxiv.org/pdf/1711.00489.pdf
