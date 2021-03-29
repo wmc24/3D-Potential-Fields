@@ -78,7 +78,7 @@ class Window:
         self.surface.fill("#000000", pg.Rect(0, 0, self.width, self.height))
         if self.paused:
             self.draw_vfield()
-        self.draw_entities()
+        self.draw_world()
         self.draw_hud()
         pg.display.update()
 
@@ -131,7 +131,7 @@ class Window:
             ]
             pg.draw.polygon(self.surface, color, points)
 
-    def draw_entities(self):
+    def draw_world(self):
         for resource, goals in self.world.resource_goals.items():
             for i, goal in enumerate(goals):
                 pos = self.camera.transform_position(goal.pos)
@@ -174,44 +174,4 @@ class Window:
         for name_img in self.resource_names:
             self.surface.blit(name_img, (x, 20))
             x += 20 + name_img.get_width()
-
-    def plot(self):
-        if len(self.world.size) != 2:
-            return
-
-        fig, ax = plt.subplots()
-
-        speed = 100 # Arbitrary
-
-        N = 50
-        corner1 = self.camera.untransform_position(np.array([0, 0]))
-        corner2 = self.camera.untransform_position(np.array([self.width, self.height]))
-
-        X, Y = np.meshgrid(np.linspace(corner1[0], corner2[0], N), np.linspace(corner1[1], corner2[1], N))
-        U = np.zeros_like(X)
-        V = np.zeros_like(Y)
-        for i, j in np.ndindex((N, N)):
-            pos = np.array([X[i, j], Y[i, j]])
-            velocity = self.world.get_velocity_field(pos, speed, self.active_agent)
-            U[i, j] = velocity[0]
-            V[i, j] = velocity[1]
-        plt.quiver(X, Y, U, V, units="width")
-
-        for obstacle in self.world.obstacles:
-            ax.add_artist(plt.Circle(obstacle.pos, obstacle.radius, color="gray"))
-        for agent in self.world.agents:
-            color = self.world.resource_colors[agent.resource]
-            ax.add_artist(plt.Circle(agent.pos, agent.radius, color=color))
-            log_poses = agent.get_log_poses()
-            plt.plot(log_poses[0,:], log_poses[1,:], color=color)
-            if agent.goal is not None:
-                # Only plot active goals
-                plt.scatter(agent.goal.pos[0], agent.goal.pos[1], color=color, marker="x", s=100)
-
-        plt.axis('equal')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.xlim([corner1[0], corner2[0]])
-        plt.ylim([corner2[1], corner1[1]])
-        plt.show()
 

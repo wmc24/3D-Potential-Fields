@@ -62,34 +62,6 @@ class Camera2D:
         if key in self.keys:
             self.keys[key] = value
 
-    def get_random_offscreen_trajectory(self, padding=0):
-        side = np.random.randint(4)
-        loc = np.random.random()
-        angle = -0.5+np.random.random()
-        angle += side*np.pi/2
-        direction = np.array([np.cos(angle), np.sin(angle)])
-        if side == 0:
-            pos = np.array(-self.screen_centre)
-            pos[1] += loc * self.screen_size[1]
-            pos = self.untransform_position(pos)
-            pos[0] -= padding
-        elif side == 1:
-            pos = np.array(-self.screen_centre)
-            pos[0] += loc * self.screen_size[0]
-            pos = self.untransform_position(pos)
-            pos[1] -= padding
-        elif side == 2:
-            pos = np.array(self.screen_centre)
-            pos[1] -= loc * self.screen_size[1]
-            pos = self.untransform_position(pos)
-            pos[0] += padding
-        elif side == 3:
-            pos = np.array(self.screen_centre)
-            pos[0] -= loc * self.screen_size[0]
-            pos = self.untransform_position(pos)
-            pos[1] += padding
-        return pos, direction
-
 
 class Camera3D(object):
     def __init__(self, screen_centre):

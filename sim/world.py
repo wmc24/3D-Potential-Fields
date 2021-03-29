@@ -8,6 +8,38 @@ from .geometry import Pose2D, Pose3D, Goal
 def entities_collide(entity1, entity2):
     return (np.linalg.norm(entity1.pos - entity2.pos) <= entity1.radius + entity2.radius)
 
+def get_random_meteoroid_trajectory(size, padding=0):
+    side = np.random.randint(4)
+    loc = np.random.random()
+    angle = -0.5+np.random.random()
+    angle += side*np.pi/2
+    direction = np.array([np.cos(angle), np.sin(angle)])
+    size = size.astype(np.float32)
+    if side == 0:
+        pos = -size/2
+        pos[1] += loc * size[1]
+        pos[0] -= padding
+    elif side == 1:
+        pos = -size/2
+        pos[0] += loc * size[0]
+        pos[1] -= padding
+    elif side == 2:
+        pos = size/2
+        pos[1] -= loc * size[1]
+        pos[0] += padding
+    elif side == 3:
+        pos = size/2
+        pos[0] -= loc * size[0]
+        pos[1] += padding
+    return pos, direction
+
+def obstacle_outside_bounds(pos, vel, size, padding=0):
+    if pos[0] < -size[0]/2-padding and vel[0] < 0: return True
+    if pos[0] > size[0]/2+padding and vel[0] > 0: return True
+    if pos[1] < -size[1]/2-padding and vel[1] < 0: return True
+    if pos[1] > size[1]/2+padding and vel[1] > 0: return True
+    return False
+
 
 class Entity(object):
     def __init__(self, pos, radius):
@@ -161,10 +193,9 @@ class World:
 
     def spawn_meteoroid(self):
         radius = 20 + np.random.random()*20
-        # TODO:
-        # pos, direction = self.get_random_meteoroid_trajectory()
+        pos, direction = get_random_meteoroid_trajectory(self.size, radius)
         speed = 500 + np.random.random()*1500
-        # self.obstacles.append(Obstacle(pos, radius, speed*direction, True))
+        self.obstacles.append(Obstacle(pos, radius, speed*direction, True))
 
     def update(self, dt):
         # Randomly spawn meteoroids
@@ -187,9 +218,12 @@ class World:
         # Now remove destructable obstacles in a collision state or
         # outside the arena (and moving out the arena)
         for i in range(len(self.obstacles)):
-            # TODO
-            # if obstacle_outside_bounds(self.obstacles[i], self.size):
-            #     self.obstacles[i].set_remove_flag()
+            if obstacle_outside_bounds(
+                    self.obstacles[i].pos,
+                    self.obstacles[i].velocity,
+                    self.size,
+                    self.obstacles[i].radius):
+                self.obstacles[i].set_remove_flag()
             for j in range(i+1, len(self.obstacles)):
                 if entities_collide(self.obstacles[i], self.obstacles[j]):
                     self.obstacles[i].set_remove_flag()

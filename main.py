@@ -5,9 +5,10 @@ import argparse
 from vfields import AnalyticalVFields, NeuralNetVFields
 from sim import World
 from sim import Window
+from plotting import plot_world
 
 def create_2d_world(vfields):
-    world = World(2, 1000, vfields, 100)
+    world = World(2, 2000, vfields, 100)
 
     world.add_planet(np.array([-300, -300], dtype=np.float32), 100)
     world.add_planet(np.array([0, 200], dtype=np.float32), 80)
@@ -82,18 +83,16 @@ def main():
                 break
             window.draw()
         pg.quit()
-
-        window.plot()
+        plot_world(world, window.active_agent)
     else:
         dt = 1e-2
         t = 0
         while t < args.T:
             world.update(dt)
             t += dt
+        # Pick an arbitrary active agent.
+        plot_world(world, world.agents[0])
 
-    # TODO: Make the whole world be plotted, not just
-    # current view in window. Then make plotting independent
-    # of window.
 
 if __name__ == '__main__':
     main()
