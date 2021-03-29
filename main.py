@@ -8,7 +8,7 @@ from sim import Window
 from plotting import plot_world
 
 def create_2d_world(vfields):
-    world = World(2, 2000, vfields, 100)
+    world = World(N=2, width=2000, vfields=vfields)
 
     world.add_planet(np.array([-300, -300], dtype=np.float32), 100)
     world.add_planet(np.array([0, 200], dtype=np.float32), 80)
@@ -49,7 +49,46 @@ def create_2d_world(vfields):
     return world
 
 def create_3d_world(vfields):
-    pass # TODO
+    world = World(N=3, width=2000, vfields=vfields)
+
+    world.add_planet(np.array([-300, -300, 100], dtype=np.float32), 100)
+    world.add_planet(np.array([0, 200, 0], dtype=np.float32), 80)
+    world.add_planet(np.array([400, -100, -100], dtype=np.float32), 80)
+
+    world.add_agent(
+        pos = np.array([100, 0, 0], dtype=np.float32),
+        radius = 20,
+        max_speed = 2000,
+        max_angular_speed = 2,
+        resource = "FUEL",
+        color = "#ff0000")
+    world.add_agent(
+        pos = np.array([0, 0, 0], dtype=np.float32),
+        radius = 15,
+        max_speed = 4000,
+        max_angular_speed = 4,
+        resource = "METALS",
+        color = "#00ff00")
+    world.add_agent(
+        pos = np.array([-100, 0, 0], dtype=np.float32),
+        radius = 12,
+        max_speed = 5000,
+        max_angular_speed = 6,
+        resource = "WATER",
+        color = "#0000ff")
+
+    world.add_goal(0, "FUEL")
+    world.add_goal(0, "METALS")
+    world.add_goal(0, "WATER")
+    world.add_goal(1, "FUEL")
+    world.add_goal(1, "METALS")
+    world.add_goal(1, "WATER")
+    world.add_goal(2, "FUEL")
+    world.add_goal(2, "METALS")
+    world.add_goal(2, "WATER")
+
+    return world
+
 
 def main():
     parser = argparse.ArgumentParser(description="Runs spaceships simulation")

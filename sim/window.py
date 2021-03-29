@@ -17,7 +17,7 @@ class Window:
             self.camera = Camera2D(np.array([width, height]))
             self.camera.scale = 2
         else:
-            sef.camera = Camera3D(np.array([width, height]))
+            self.camera = Camera3D(np.array([width, height]))
 
         self.paused = False
         self.active_agent = None
@@ -27,23 +27,32 @@ class Window:
         for resource, color in self.world.resource_colors.items():
             self.resource_names.append(font.render(resource, True, color))
 
+    def get_mouse_dist_function(self, mouse_pos):
+        if self.world.N == 2:
+            pos = self.camera.untransform_position(np.array(mouse_pos))
+            return lambda x: np.linalg.norm(pos - x)
+        else:
+            pos, direction = self.camera.project_position(np.array(mouse_pos))
+            return lambda x: np.linalg.norm(
+                (pos-x) - direction*np.dot(direction, pos-x))
+
     def set_active_agent(self, mouse_pos):
-        pos = self.camera.untransform_position(np.array(mouse_pos))
         min_dist = None
         self.active_agent = None
+        dist_f = self.get_mouse_dist_function(mouse_pos)
         for i, agent in enumerate(self.world.agents):
-            dist = np.linalg.norm(pos - agent.pos)
+            dist = dist_f(agent.pos)
             if dist < 100 and (min_dist is None or dist < min_dist):
                 min_dist = dist
                 self.active_agent = agent
 
     def set_clicked_goal(self, mouse_pos):
         if self.active_agent is None: return
-        pos = self.camera.untransform_position(np.array(mouse_pos))
         resource_goals = self.world.resource_goals[self.active_agent.resource]
         min_dist = None
+        dist_f = self.get_mouse_dist_function(mouse_pos)
         for i, goal in enumerate(resource_goals):
-            dist = np.linalg.norm(pos - goal.pos)
+            dist = dist_f(goal)
             if dist < 100 and (min_dist is None or dist < min_dist):
                 min_dist = dist
                 self.active_agent.goal = goal
@@ -76,7 +85,7 @@ class Window:
 
     def draw(self):
         self.surface.fill("#000000", pg.Rect(0, 0, self.width, self.height))
-        if self.paused:
+        if self.paused and self.world.N==2:
             self.draw_vfield()
         self.draw_world()
         self.draw_hud()
@@ -135,21 +144,24 @@ class Window:
         for resource, goals in self.world.resource_goals.items():
             for i, goal in enumerate(goals):
                 pos = self.camera.transform_position(goal.pos)
+                if pos is None: continue
                 direction = self.camera.transform_direction(goal.direction)
                 color = self.world.resource_colors[resource]
                 radius = self.camera.transform_size(goal.close_dist/2)
-                dir_length = self.camera.transform_size(50)
+                dir_length = self.camera.transform_size(100)
                 pg.draw.circle(self.surface, color, pos, radius)
                 pg.draw.line(self.surface, color,
                     pos, pos+direction*dir_length, 2)
 
         for obstacle in self.world.obstacles:
             pos = self.camera.transform_position(obstacle.pos)
+            if pos is None: continue
             radius = self.camera.transform_size(obstacle.radius)
             pg.draw.circle(self.surface, "#999999", pos, radius)
 
         for agent in self.world.agents:
             pos = self.camera.transform_position(agent.pos)
+            if pos is None: continue
             direction = self.camera.transform_direction(agent.pose.get_direction())
             velocity_line = 0.1 * direction * np.linalg.norm(agent.velocity)
 
@@ -165,6 +177,7 @@ class Window:
 
             if agent.goal is not None:
                 goal_pos = self.camera.transform_position(agent.goal.pos)
+                if goal_pos is None: continue
                 goal_direction = self.camera.transform_direction(agent.goal.direction)
                 close_radius = self.camera.transform_size(goal.close_dist)
                 pg.draw.circle(self.surface, color, goal_pos, close_radius, 2)

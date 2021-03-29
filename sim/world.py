@@ -125,7 +125,7 @@ class Agent(Entity):
             return self.log_poses[:, :self.log_i]
 
 class World:
-    def __init__(self, N, width, vfields, log_size=0):
+    def __init__(self, N, width, vfields, log_size=100):
         self.N = N
         self.size = np.full(N, width)
         self.vfields = vfields
@@ -154,13 +154,16 @@ class World:
     def add_goal(self, planet_i, resource):
         if not resource in self.resource_goals:
             self.resource_goals[resource] = []
-        # Assume at this point, the only obstacles are planets
-        # Pick random position along planet circumference. Don't bother checking
-        # for goal collisions at the moment
+
         angle = np.random.random()*2*np.pi
         direction = np.array([np.cos(angle), np.sin(angle)])
         planet = self.obstacles[planet_i]
-        pos = planet.pos + 1.5*planet.radius*direction
+        if self.N==3:
+            vert_angle = np.random.random()*np.pi
+            direction *= np.cos(vert_angle)
+            direction = np.array([direction[0], direction[1], np.sin(vert_angle)])
+
+        pos = planet.pos + 1.8*planet.radius*direction
         self.resource_goals[resource].append(Goal(pos, -direction))
 
     def get_velocity_field(self, pos, speed, agent=None):
