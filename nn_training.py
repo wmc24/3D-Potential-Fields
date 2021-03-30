@@ -173,7 +173,7 @@ class Dataset(BaseDataset):
             theta = np.random.uniform(0, 2*np.pi)
             phi = np.random.uniform(0, np.pi)
             spaceship_position = np.array([dist_to_spaceship*np.cos(theta)*np.cos(phi), dist_to_spaceship*np.sin(theta)*np.cos(phi), dist_to_spaceship*np.sin(phi)])
-        spaceship = np.concatenate((spaceship, spaceship_size), axis=None)
+        spaceship = np.concatenate((spaceship_position, spaceship_size), axis=None)
         spaceship_velocity = self.vfields.obstacle(position, spaceship, spaceship_size)
 
         # Generating a random meteoroid position and radius using a uniform distribution and its associated velocity
