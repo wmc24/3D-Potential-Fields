@@ -23,8 +23,8 @@ DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 load_model = False
-loaded_model_name = 'Debugging'
-save_model_name = 'Debugging'
+loaded_model_name = 'Goal-one-obstacle-field-for-all'
+save_model_name = 'Goal-one-obstacle-field-for-all'
 tensorboard_name = save_model_name
 tensorboard_logging = True
 perform_training = True
@@ -173,8 +173,8 @@ class Dataset(BaseDataset):
             theta = np.random.uniform(0, 2*np.pi)
             phi = np.random.uniform(0, np.pi)
             spaceship_position = np.array([dist_to_spaceship*np.cos(theta)*np.cos(phi), dist_to_spaceship*np.sin(theta)*np.cos(phi), dist_to_spaceship*np.sin(phi)])
-        spaceship_velocity = self.vfields.obstacle(position, spaceship, spaceship_size)
         spaceship = np.concatenate((spaceship, spaceship_size), axis=None)
+        spaceship_velocity = self.vfields.obstacle(position, spaceship, spaceship_size)
 
         # Generating a random meteoroid position and radius using a uniform distribution and its associated velocity
         meteoroid_size = np.random.uniform(10, 20)
