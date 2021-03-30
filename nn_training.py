@@ -33,8 +33,8 @@ perform_training = True
 # and training parameters
 num_epochs = None
 learning_rate = 1e-5
-batch_size = 10
-batch_size_doubling_epochs = [100000, 250000, 1000000, 10000000]
+batch_size = 25
+batch_size_doubling_epochs = [50000, 100000]
 
 # How many epochs to save things
 model_epochs = 1000
@@ -89,14 +89,14 @@ if load_model is True:
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(DEVICE)
     # Loading the optimizer
-    optimizer = torch.optim.Adam([
-        dict(params=model.parameters(), lr=learning_rate),
+    optimizer = torch.optim.SGD([
+        dict(params=model.parameters(), lr=learning_rate, momentum=0.9),
     ])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 else:
     # Creating the optimiser
-    optimizer = torch.optim.Adam([
-        dict(params=model.parameters(), lr=learning_rate),
+    optimizer = torch.optim.SGD([
+        dict(params=model.parameters(), lr=learning_rate, momentum=0.9),
     ])
     epoch = 0
 
@@ -120,9 +120,6 @@ class Dataset(BaseDataset):
 
     def __init__(
             self,
-            planets_pot=False,
-            spaceships_pot=False,
-            meteoroids_pot=False,
             size_of_universe=2000,
             dims=2,
             decay_radius=20,
@@ -130,9 +127,6 @@ class Dataset(BaseDataset):
             obstacle_scale=5,
             alpha=10
     ):
-        self.planets_pot = planets_pot
-        self.spaceships_pot = spaceships_pot
-        self.meteoroids_pot = meteoroids_pot
         self.size_of_universe = size_of_universe
         self.dims = dims
         self.vfields = AnalyticalVFields(decay_radius,
@@ -147,34 +141,56 @@ class Dataset(BaseDataset):
         position = np.zeros(self.dims)
 
         # Generating a random goal position using a uniform distribution and its associated velocity
-        goal_position = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=self.dims)
-        goal = Goal(goal_position, goal_position)
+        goal_position = np.random.uniform(-self.size_of_universe/2, self.size_of_universe/2, size=self.dims)
+        goal = Goal(goal_position, goal_position/np.linalg.norm(goal_position))
         goal_velocity = self.vfields.goal(position, goal)
 
         # Generating a random planet position and radius using a uniform distribution and its associated velocity
-        planet_position = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=self.dims)
         planet_radius = np.random.uniform(40, 200)
+        if np.random.uniform() < 0.75:
+            dist_to_planet = np.random.uniform(planet_radius, self.size_of_universe/4)
+        else:
+            dist_to_planet = np.random.uniform(self.size_of_universe/4, self.size_of_universe/2)
+        if self.dims == 2:
+            theta = np.random.uniform(0, 2*np.pi)
+            planet_position = np.array([dist_to_planet*np.cos(theta), dist_to_planet*np.sin(theta)])
+        else:
+            theta = np.random.uniform(0, 2*np.pi)
+            phi = np.random.uniform(0, np.pi)
+            planet_position = np.array([dist_to_planet*np.cos(theta)*np.cos(phi), dist_to_planet*np.sin(theta)*np.cos(phi), dist_to_planet*np.sin(phi)])
         planet_velocity = self.vfields.obstacle(position, planet_position, planet_radius)
 
-        # THESE ARE ALL TEMPORARY
-        planet_velocity = np.random.uniform(-1, 1, size=self.dims)
-        spaceship_velocity = np.random.uniform(-1, 1, size=self.dims)
-        meteoroid_velocity = np.random.uniform(-1, 1, size=self.dims) 
-
-        spaceship = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=self.dims)
+        # Generating a random spaceship position and radius using a uniform distribution and its associated velocity
         spaceship_size = np.random.uniform(10, 20)
+        if np.random.uniform() < 0.75:
+            dist_to_spaceship = np.random.uniform(spaceship_size/2, self.size_of_universe/4)
+        else:
+            dist_to_planet = np.random.uniform(self.size_of_universe/4, self.size_of_universe/2)
+        if self.dims == 2:
+            theta = np.random.uniform(0, 2*np.pi)
+            spaceship_position = np.array([dist_to_spaceship*np.cos(theta), dist_to_spaceship*np.sin(theta)])
+        else:
+            theta = np.random.uniform(0, 2*np.pi)
+            phi = np.random.uniform(0, np.pi)
+            spaceship_position = np.array([dist_to_spaceship*np.cos(theta)*np.cos(phi), dist_to_spaceship*np.sin(theta)*np.cos(phi), dist_to_spaceship*np.sin(phi)])
         spaceship_velocity = self.vfields.obstacle(position, spaceship, spaceship_size)
+        spaceship = np.concatenate((spaceship, spaceship_size), axis=None)
 
-        meteoroid = np.random.uniform(-self.size_of_universe/2, self.size_of_universe, size=self.dims)
+        # Generating a random meteoroid position and radius using a uniform distribution and its associated velocity
         meteoroid_size = np.random.uniform(10, 20)
+        if np.random.uniform() < 0.75:
+            dist_to_meteoroid = np.random.uniform(meteoroid_size/2, self.size_of_universe/4)
+        else:
+            dist_to_meteoroid = np.random.uniform(self.size_of_universe/4, self.size_of_universe)
+        if self.dims == 2:
+            theta = np.random.uniform(0, 2*np.pi)
+            spaceship_meteoroid = np.array([dist_to_meteoroid*np.cos(theta), dist_to_meteoroid*np.sin(theta)])
+        else:
+            theta = np.random.uniform(0, 2*np.pi)
+            phi = np.random.uniform(0, np.pi)
+            meteoroid_position = np.array([dist_to_meteoroidp*np.cos(theta)*np.cos(phi), dist_to_meteoroid*np.sin(theta)*np.cos(phi), dist_to_meteoroid*np.sin(phi)])
         meteoroid_velocity = self.vfields.obstacle(position, meteoroid, meteoroid_size)
-
-        # Converting to numpy arrays
-        #goal_position = np.array(goal_position)
-        #planet_position = np.array(planet_position)
-        #planet_radius = np.array(planet_radius).reshape((-1, 1))
-        #spaceship = np.array(spaceship).reshape((-1, self.dims*2))
-        #meteoroid = np.array(meteoroid).reshape((-1, self.dims*2))
+        meteoroid = np.concatenate((meteoroid, meteoroid_size), axis=None)
 
         return goal_position, planet_position, planet_radius, spaceship, meteoroid, goal_velocity, planet_velocity, spaceship_velocity, meteoroid_velocity
         
@@ -216,17 +232,35 @@ if perform_training is True:
                 """
                 # We train the sub-networks seperately to make it as easy as possible
                 optimizer.zero_grad()
+
                 goal_prediction = model.forward_goal(goal_position.to(DEVICE).float())
                 goal_loss = loss(goal_prediction, goal_velocity.to(DEVICE).float())
-                planet_prediction = model.forward_goal(planet_position.to(DEVICE).float())
+
+                planet_prediction = model.forward_planet(planet_position.to(DEVICE).float(), planet_radius.to(DEVICE).float())
                 planet_loss = loss(planet_prediction, planet_velocity.to(DEVICE).float())
-                spaceship_prediction = model.forward_goal(spaceship.to(DEVICE).float())
+
+                spaceship_prediction = model.forward_spaceship(spaceship.to(DEVICE).float())
                 spaceship_loss = loss(spaceship_prediction, spaceship_velocity.to(DEVICE).float())
-                meteoroid_prediction = model.forward_goal(meteoroid.to(DEVICE).float())
+
+                meteoroid_prediction = model.forward_meteoroid(meteoroid.to(DEVICE).float())
                 meteoroid_loss = loss(meteoroid_prediction, meteoroid_velocity.to(DEVICE).float())
+
                 total_loss = goal_loss + planet_loss + spaceship_loss + meteoroid_loss
                 total_loss.backward()
                 optimizer.step()
+            
+            # After 25K epochs, we switch the output non-linearity from
+            # leaky_ReLU to ReLU
+            if i % 25000 == 0:
+                try:
+                    model.switch_nonlinearity()
+                except:
+                    pass
+
+            # After 1k epochs we increase the learning rate
+            if i % 1000 == 0:
+                for g in optimizer.param_groups:
+                    g['lr'] = 1e-4
             
             # Writing values to tensorboard
             if (i % 100 == 0 or i == 1):
