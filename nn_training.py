@@ -165,7 +165,7 @@ class Dataset(BaseDataset):
         if np.random.uniform() < 0.75:
             dist_to_spaceship = np.random.uniform(spaceship_size/2, self.size_of_universe/4)
         else:
-            dist_to_planet = np.random.uniform(self.size_of_universe/4, self.size_of_universe/2)
+            dist_to_spaceship = np.random.uniform(self.size_of_universe/4, self.size_of_universe/2)
         if self.dims == 2:
             theta = np.random.uniform(0, 2*np.pi)
             spaceship_position = np.array([dist_to_spaceship*np.cos(theta), dist_to_spaceship*np.sin(theta)])
@@ -173,8 +173,8 @@ class Dataset(BaseDataset):
             theta = np.random.uniform(0, 2*np.pi)
             phi = np.random.uniform(0, np.pi)
             spaceship_position = np.array([dist_to_spaceship*np.cos(theta)*np.cos(phi), dist_to_spaceship*np.sin(theta)*np.cos(phi), dist_to_spaceship*np.sin(phi)])
+        spaceship_velocity = self.vfields.obstacle(position, spaceship_position, spaceship_size)
         spaceship = np.concatenate((spaceship_position, spaceship_size), axis=None)
-        spaceship_velocity = self.vfields.obstacle(position, spaceship, spaceship_size)
 
         # Generating a random meteoroid position and radius using a uniform distribution and its associated velocity
         meteoroid_size = np.random.uniform(10, 20)
@@ -184,13 +184,13 @@ class Dataset(BaseDataset):
             dist_to_meteoroid = np.random.uniform(self.size_of_universe/4, self.size_of_universe)
         if self.dims == 2:
             theta = np.random.uniform(0, 2*np.pi)
-            spaceship_meteoroid = np.array([dist_to_meteoroid*np.cos(theta), dist_to_meteoroid*np.sin(theta)])
+            meteoroid_position = np.array([dist_to_meteoroid*np.cos(theta), dist_to_meteoroid*np.sin(theta)])
         else:
             theta = np.random.uniform(0, 2*np.pi)
             phi = np.random.uniform(0, np.pi)
-            meteoroid_position = np.array([dist_to_meteoroidp*np.cos(theta)*np.cos(phi), dist_to_meteoroid*np.sin(theta)*np.cos(phi), dist_to_meteoroid*np.sin(phi)])
-        meteoroid_velocity = self.vfields.obstacle(position, meteoroid, meteoroid_size)
-        meteoroid = np.concatenate((meteoroid, meteoroid_size), axis=None)
+            meteoroid_position = np.array([dist_to_meteoroid*np.cos(theta)*np.cos(phi), dist_to_meteoroid*np.sin(theta)*np.cos(phi), dist_to_meteoroid*np.sin(phi)])
+        meteoroid_velocity = self.vfields.obstacle(position, meteoroid_position, meteoroid_size)
+        meteoroid = np.concatenate((meteoroid_position, meteoroid_size), axis=None)
 
         return goal_position, planet_position, planet_radius, spaceship, meteoroid, goal_velocity, planet_velocity, spaceship_velocity, meteoroid_velocity
         
