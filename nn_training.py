@@ -41,7 +41,7 @@ model_epochs = 1000
 model_checkpoint_epochs = 50000
 
 # Dimension of scenario
-DIMENSIONS = 2
+DIMENSIONS = 3
 
 
 """-------------------------------------------------------------------------"""
