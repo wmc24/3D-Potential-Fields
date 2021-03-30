@@ -26,7 +26,7 @@ load_model = False
 loaded_model_name = 'Debugging'
 save_model_name = 'Debugging'
 tensorboard_name = save_model_name
-tensorboard_logging = False
+tensorboard_logging = True
 perform_training = True
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
@@ -229,94 +229,95 @@ if perform_training is True:
                 optimizer.step()
             
             # Writing values to tensorboard
-            if (i % 100 == 0 or i == 1) and tensorboard_logging is True:
+            if (i % 100 == 0 or i == 1):
                 print('\nEpoch: {}'.format(i))
-                goal_prediction = goal_prediction.cpu().detach().numpy()
-                planet_prediction = planet_prediction.cpu().detach().numpy()
-                spaceship_prediction = spaceship_prediction.cpu().detach().numpy()
-                meteoroid_prediction = meteoroid_prediction.cpu().detach().numpy()
-                prediction = goal_prediction + planet_prediction + spaceship_prediction + meteoroid_prediction
-                goal_velocity = goal_velocity.numpy()
-                planet_velocity = planet_velocity.numpy()
-                spaceship_velocity = spaceship_velocity.numpy()
-                meteoroid_velocity = meteoroid_velocity.numpy()
-                velocity = goal_velocity + planet_velocity + spaceship_velocity + meteoroid_velocity
-                if DIMENSIONS == 2:
-                    writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
-                                    'x - median': np.median(np.abs(velocity[:, 0] - prediction[:, 0])),
-                                    'y - median': np.median(np.abs(velocity[:, 1] - prediction[:, 1]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/3 - Absolute Goal Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
-                                    'x - median': np.median(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/4 - Absolute Planets Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
-                                    'x - median': np.median(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/5 - Absolute Spaceships Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
-                                    'x - median': np.median(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/6 - Absolute Meteoroids Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
-                                    'x - median': np.median(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1]))},
-                                    global_step=i)
-                    writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
-                else:
-                    writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
-                                    'z - mean': np.mean(np.abs(velocity[:, 2] - prediction[:, 2])),
-                                    'x - median': np.median(np.abs(velocity[:, 0] - prediction[:, 0])),
-                                    'y - median': np.median(np.abs(velocity[:, 1] - prediction[:, 1])),
-                                    'z - median': np.median(np.abs(velocity[:, 2] - prediction[:, 2]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/3 - Absolute Goal Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
-                                    'z - mean': np.mean(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2])),
-                                    'x - median': np.median(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
-                                    'z - median': np.median(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/4 - Absolute Planets Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
-                                    'z - mean': np.mean(np.abs(planet_velocity[:, 2] - planet_prediction[:, 2])),
-                                    'x - median': np.median(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
-                                    'z - median': np.median(np.abs(planet_velocity[:, 2] - planet_prediction[:, 2]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/5 - Absolute Spaceships Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
-                                    'z - mean': np.mean(np.abs(spaceship_velocity[:, 2] - spaceship_prediction[:, 2])),
-                                    'x - median': np.median(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
-                                    'z - median': np.median(np.abs(spaceship_velocity[:, 2] - spaceship_prediction[:, 2]))},
-                                    global_step=i)
-                    writer.add_scalars(f'{tensorboard_name}/6 - Absolute Meteorites Velocity Errors (m/s)',
-                                    {'x - mean': np.mean(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
-                                    'y - mean': np.mean(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
-                                    'z - mean': np.mean(np.abs(meteoroid_velocity[:, 2] - meteoroid_prediction[:, 2])),
-                                    'x - median': np.median(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
-                                    'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
-                                    'z - median': np.median(np.abs(meteoroid_velocity[:, 2] - meteoroid_prediction[:, 2]))},
-                                    global_step=i)
-                    writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
+                if tensorboard_logging is True:
+                    goal_prediction = goal_prediction.cpu().detach().numpy()
+                    planet_prediction = planet_prediction.cpu().detach().numpy()
+                    spaceship_prediction = spaceship_prediction.cpu().detach().numpy()
+                    meteoroid_prediction = meteoroid_prediction.cpu().detach().numpy()
+                    prediction = goal_prediction + planet_prediction + spaceship_prediction + meteoroid_prediction
+                    goal_velocity = goal_velocity.numpy()
+                    planet_velocity = planet_velocity.numpy()
+                    spaceship_velocity = spaceship_velocity.numpy()
+                    meteoroid_velocity = meteoroid_velocity.numpy()
+                    velocity = goal_velocity + planet_velocity + spaceship_velocity + meteoroid_velocity
+                    if DIMENSIONS == 2:
+                        writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
+                                        'x - median': np.median(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                        'y - median': np.median(np.abs(velocity[:, 1] - prediction[:, 1]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/3 - Absolute Goal Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
+                                        'x - median': np.median(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/4 - Absolute Planets Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
+                                        'x - median': np.median(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/5 - Absolute Spaceships Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
+                                        'x - median': np.median(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/6 - Absolute Meteoroids Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
+                                        'x - median': np.median(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1]))},
+                                        global_step=i)
+                        writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
+                    else:
+                        writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
+                                        'z - mean': np.mean(np.abs(velocity[:, 2] - prediction[:, 2])),
+                                        'x - median': np.median(np.abs(velocity[:, 0] - prediction[:, 0])),
+                                        'y - median': np.median(np.abs(velocity[:, 1] - prediction[:, 1])),
+                                        'z - median': np.median(np.abs(velocity[:, 2] - prediction[:, 2]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/3 - Absolute Goal Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
+                                        'z - mean': np.mean(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2])),
+                                        'x - median': np.median(np.abs(goal_velocity[:, 0] - goal_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(goal_velocity[:, 1] - goal_prediction[:, 1])),
+                                        'z - median': np.median(np.abs(goal_velocity[:, 2] - goal_prediction[:, 2]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/4 - Absolute Planets Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
+                                        'z - mean': np.mean(np.abs(planet_velocity[:, 2] - planet_prediction[:, 2])),
+                                        'x - median': np.median(np.abs(planet_velocity[:, 0] - planet_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(planet_velocity[:, 1] - planet_prediction[:, 1])),
+                                        'z - median': np.median(np.abs(planet_velocity[:, 2] - planet_prediction[:, 2]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/5 - Absolute Spaceships Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
+                                        'z - mean': np.mean(np.abs(spaceship_velocity[:, 2] - spaceship_prediction[:, 2])),
+                                        'x - median': np.median(np.abs(spaceship_velocity[:, 0] - spaceship_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(spaceship_velocity[:, 1] - spaceship_prediction[:, 1])),
+                                        'z - median': np.median(np.abs(spaceship_velocity[:, 2] - spaceship_prediction[:, 2]))},
+                                        global_step=i)
+                        writer.add_scalars(f'{tensorboard_name}/6 - Absolute Meteorites Velocity Errors (m/s)',
+                                        {'x - mean': np.mean(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
+                                        'y - mean': np.mean(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
+                                        'z - mean': np.mean(np.abs(meteoroid_velocity[:, 2] - meteoroid_prediction[:, 2])),
+                                        'x - median': np.median(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
+                                        'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
+                                        'z - median': np.median(np.abs(meteoroid_velocity[:, 2] - meteoroid_prediction[:, 2]))},
+                                        global_step=i)
+                        writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
             
             # Doubling the batch size at fixed epochs
             if i in batch_size_doubling_epochs:
