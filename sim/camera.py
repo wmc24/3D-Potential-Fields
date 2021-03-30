@@ -57,12 +57,11 @@ class Camera2D:
 
 
 class Camera3D(object):
-    def __init__(self, screen_centre, focal_length=500, clipping_dist=5):
+    def __init__(self, screen_centre, focal_length=500, clipping_dist=20):
         self.screen_centre = np.concatenate([screen_centre, [0]])
         self.focal_length = focal_length
         self.clipping_dist = clipping_dist
         self.pos = np.zeros(3, dtype=np.float32)
-        self.scale = 1
         self.angle = 0
         self.update_R()
 
@@ -96,20 +95,17 @@ class Camera3D(object):
         # Only control yaw, don't bother with pitch
 
     def update(self, dt):
-        self.velocity[2] = -self.scale*self.speed*(self.keys[pg.K_w] - self.keys[pg.K_s])
-        self.velocity[0] = self.scale*self.speed*(self.keys[pg.K_d] - self.keys[pg.K_a])
-        self.velocity[1] = self.scale*self.speed*(self.keys[pg.K_SPACE] - self.keys[pg.K_LSHIFT])
+        self.velocity[2] = -self.speed*(self.keys[pg.K_w] - self.keys[pg.K_s])
+        self.velocity[0] = self.speed*(self.keys[pg.K_d] - self.keys[pg.K_a])
+        self.velocity[1] = self.speed*(self.keys[pg.K_SPACE] - self.keys[pg.K_LSHIFT])
 
         self.pos += np.matmul(self.R, self.velocity)*dt
 
         self.angle += dt*self.rotate_speed*(self.keys[pg.K_q] - self.keys[pg.K_e])
         self.update_R()
 
-        self.zoom_velocity = -self.zoom_speed*(self.keys[pg.K_EQUALS] - self.keys[pg.K_MINUS])
-        self.scale = np.exp(np.log(self.scale) + self.zoom_velocity*dt)
-
     def transform_position(self, pos):
-        pos_3d = np.matmul(self.R.transpose(), pos-self.pos)/self.scale
+        pos_3d = np.matmul(self.R.transpose(), pos-self.pos)
         z = pos_3d[2]
         if z > -self.clipping_dist: return None
         # Allow pos_3d[2] to be used for depth
@@ -121,12 +117,13 @@ class Camera3D(object):
     def transform_circle(self, pos, radius):
         screen_pos = self.transform_position(pos)
         if screen_pos is None: return None, None
-        return screen_pos, (radius/self.scale) * self.focal_length/screen_pos[2]
+        # In reality, get an ellipse, but a reasonable approximation
+        return screen_pos, radius * self.focal_length/screen_pos[2]
 
     def project_position(self, pos):
-        pos_3d = np.array([pos[0], pos[1], -self.focal_length])
+        pos_3d = np.array([pos[0]-self.screen_centre[0], -(pos[1]-self.screen_centre[1]), -self.focal_length])
         direction = pos_3d / np.linalg.norm(pos_3d)
-        pos_3d = self.pos + np.matmul(self.R, pos_3d)*self.scale
+        pos_3d = self.pos + np.matmul(self.R, pos_3d)
         direction = np.matmul(self.R, direction)
         direction[1] = -direction[1]
         return pos_3d, direction

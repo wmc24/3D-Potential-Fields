@@ -27,11 +27,6 @@ class Pose2D(object):
         while (self.angle > np.pi): self.angle -= 2*np.pi
         self.update_R()
 
-    def point_towards(self, pos):
-        displacement = pos - self.pos
-        angle = np.arctan2(displacement[1], displacement[0])
-        self.update_R()
-
     def update_R(self):
         self.R = np.array([
             [np.cos(self.angle), -np.sin(self.angle)],
@@ -64,36 +59,19 @@ class Pose3D(object):
             linear_vel *= max_speed/np.linalg.norm(max_speed)
         self.pos += dt * linear_vel
 
-        theta_hat = np.matmul(self.R, np.array([0, pose_vel[1], pose_vel[2]]))
-        dtheta = np.linalg.norm(theta_hat)
-        if (dtheta==0): return
-        theta_hat /= dtheta
+        omega = np.matmul(self.R, np.array([0, pose_vel[1], pose_vel[2]]))
+        dtheta = np.linalg.norm(omega)
+        if dtheta==0: return
+        n = omega / dtheta
         S = np.array([
-            [0, -theta_hat[2], theta_hat[1]],
-            [theta_hat[2], 0, -theta_hat[0]],
-            [-theta_hat[1], theta_hat[0], 0]
+            [0, -n[2], n[1]],
+            [n[2], 0, -n[0]],
+            [-n[1], n[0], 0]
         ])
 
         if abs(dtheta) > max_angular_speed:
             dtheta = max_angular_speed * np.sign(dtheta)
-        self.R += S*np.sin(dtheta*dt) + np.matmul(S,S)*(1 - np.cos(dtheta*dt))
-
-    def point_towards(self, pos):
-        displacement = pos - self.pos
-
-        r1 = displacement/np.linalg.norm(displacement)
-        r2 = r1
-        r2[2] = 0
-        if (np.linalg.norm(r2) == 0):
-            r2[0] = 1
-        else:
-            angle = np.arcsin(r1[2]) - np.pi/2
-            r2 *= np.cos(angle)/np.linalg.norm(r2)
-            r2[2] = np.sin(angle)
-        r3 = np.cross(r1, r2)
-        self.R[:, 0] = r1
-        self.R[:, 1] = r2
-        self.R[:, 2] = r3
+        self.R = np.matmul(np.eye(3) + S*np.sin(dtheta*dt) + np.matmul(S,S)*(1 - np.cos(dtheta*dt)), self.R)
 
     def get_vector(self):
         return np.concatenate([self.pos, self.R[:,0]])

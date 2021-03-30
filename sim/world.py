@@ -123,6 +123,7 @@ class World:
         self.obstacles = []
         self.meteoroid_spawn_rate = 1
         self.meteoroid_spawn_timer = 0
+        self.meteoroid_enable = False
         self.set_meteoroid_spawn_time()
         self.log_size = log_size
         self.resource_colors = {}
@@ -182,7 +183,7 @@ class World:
         agent.last_goal_i = indexes[i]
 
     def set_meteoroid_spawn_time(self):
-        self.meteoroid_spawn_time = -np.log(np.random.random())/self.meteoroid_spawn_rate
+        self.meteoroid_spawn_time = -np.log(np.random.random())*self.meteoroid_spawn_rate
 
     def spawn_meteoroid(self):
         radius = 20 + np.random.random()*20
@@ -192,11 +193,12 @@ class World:
 
     def update(self, dt):
         # Randomly spawn meteoroids
-        self.meteoroid_spawn_timer += dt
-        if self.meteoroid_spawn_timer > self.meteoroid_spawn_time:
-            self.spawn_meteoroid()
-            self.meteoroid_spawn_timer = 0
-            self.set_meteoroid_spawn_time()
+        if self.meteoroid_enable:
+            self.meteoroid_spawn_timer += dt
+            if self.meteoroid_spawn_timer > self.meteoroid_spawn_time:
+                self.spawn_meteoroid()
+                self.meteoroid_spawn_timer = 0
+                self.set_meteoroid_spawn_time()
 
         for agent in self.agents:
             if agent.goal is None:
