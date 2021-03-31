@@ -22,11 +22,11 @@ from torch.utils.data import Dataset as BaseDataset
 DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-load_model = False
+load_model = True
 loaded_model_name = 'Goal-one-obstacle-field-for-all'
 save_model_name = 'Goal-one-obstacle-field-for-all'
 tensorboard_name = save_model_name
-tensorboard_logging = False
+tensorboard_logging = True
 perform_training = True
 # Whether or not to train the subnetworks together or seperately
 combined_training = False
@@ -34,7 +34,7 @@ combined_training = False
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
 num_epochs = None
-learning_rate = 1e-2
+learning_rate = 1e-3
 batch_size = 100
 batch_size_doubling_epochs = [50000, 100000]
 
@@ -80,6 +80,7 @@ if load_model is True:
     if load_dims != DIMENSIONS:
         raise ValueError(f'Model is for {load_dims} dimensions and we are trying to train {DIMENSIONS} dimensions')
     model.load_state_dict(checkpoint['model_state_dict'])
+    model.whitening = checkpoint['whitening']
     model.to(DEVICE)
     # Loading the optimizer
     optimizer = torch.optim.SGD([
@@ -212,6 +213,7 @@ if perform_training is True:
             for index, (goal_position, planet_position, planet_radius, spaceship, meteoroid, goal_velocity, planet_velocity, spaceship_velocity, meteoroid_velocity) in enumerate(dataloader):
                 if i == 1:
                     # performing data whitening
+                    print("Calculating Data Whitening")
                     model.data_whitening(goal_position, planet_position, planet_radius, spaceship, meteoroid, DEVICE)
 
                 if combined_training is True:
@@ -360,6 +362,7 @@ if perform_training is True:
             if i % model_epochs == 0:
                 model_data = {'epoch': i,
                               'dims': DIMENSIONS,
+                              'whitening': model.whitening,
                               'model_state_dict': model.state_dict(),
                               'optimizer_state_dict': optimizer.state_dict()}
                 torch.save(model_data, save_dir)
@@ -371,6 +374,7 @@ if perform_training is True:
             if i % model_checkpoint_epochs == 0:
                 model_data = {'epoch': i,
                               'dims': DIMENSIONS,
+                              'whitening': model.whitening,
                               'model_state_dict': model.state_dict(),
                               'optimizer_state_dict': optimizer.state_dict()}
                 checkpoint_dir = os.path.join('models', f'{save_model_name}_{i}.tar')
@@ -382,6 +386,7 @@ if perform_training is True:
                 if i == num_epochs + epoch:
                     model_data = {'epoch': i,
                                   'dims': DIMENSIONS,
+                                  'whitening': model.whitening,
                                   'model_state_dict': model.state_dict(),
                                   'optimizer_state_dict': optimizer.state_dict()}
                     torch.save(model_data, save_dir)
@@ -391,6 +396,7 @@ if perform_training is True:
     except KeyboardInterrupt:
         model_data = {'epoch': i,
                       'dims': DIMENSIONS,
+                      'whitening': model.whitening,
                       'model_state_dict': model.state_dict(),
                       'optimizer_state_dict': optimizer.state_dict()}
         torch.save(model_data, save_dir)

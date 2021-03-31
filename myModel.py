@@ -70,6 +70,27 @@ class Net(nn.Module):
       self.meteoroid_linear4 = nn.Linear(8, 8)
       self.meteoroid_linear5 = nn.Linear(8, 1)
 
+      self.whitening_goal_mean = 0
+      self.whitening_goal_sigma = 1
+      self.whitening_planet_position_mean = 0
+      self.whitening_planet_position_sigma = 1
+      self.whitening_planet_radii_mean = 0
+      self.whitening_planet_radii_sigma = 1
+      self.whitening_spaceships_mean = 0
+      self.whitening_spaceships_sigma = 1
+      self.whitening_meteoroids_mean = 0
+      self.whitening_meteoroids_sigma = 1    
+      self.whitening = (self.whitening_goal_mean,
+                        self.whitening_goal_sigma,
+                        self.whitening_meteoroids_mean,
+                        self.whitening_meteoroids_sigma,
+                        self.whitening_planet_position_mean,
+                        self.whitening_planet_position_sigma,
+                        self.whitening_planet_radii_mean,
+                        self.whitening_planet_radii_sigma,
+                        self.whitening_spaceships_mean,
+                        self.whitening_spaceships_sigma)
+
     def data_whitening(self, goal_position, planets_position, planets_radii, spaceships, meteoroids, device):
       # Computing a data whitening matrix for all the nets to improve training at beginning
       self.whitening_goal_mean, self.whitening_goal_sigma = whitening(goal_position, device)
@@ -77,6 +98,16 @@ class Net(nn.Module):
       self.whitening_planet_radii_mean, self.whitening_planet_radii_sigma = whitening(planets_radii, device)
       self.whitening_spaceships_mean, self.whitening_spaceships_sigma = whitening(spaceships, device)
       self.whitening_meteoroids_mean, self.whitening_meteoroids_sigma = whitening(meteoroids, device)
+      self.whitening = (self.whitening_goal_mean,
+                        self.whitening_goal_sigma,
+                        self.whitening_meteoroids_mean,
+                        self.whitening_meteoroids_sigma,
+                        self.whitening_planet_position_mean,
+                        self.whitening_planet_position_sigma,
+                        self.whitening_planet_radii_mean,
+                        self.whitening_planet_radii_sigma,
+                        self.whitening_spaceships_mean,
+                        self.whitening_spaceships_sigma)
 
     # The passed arguements are of the dimensions:
     # goal_position - (dims)
@@ -133,7 +164,7 @@ class Net(nn.Module):
       # Pass data through first linear layer
 
       # Performing data whitening
-      goal_position = (goal_position - self.whitening_goal_mean) / self.whitening_goal_sigma
+      goal_position = (goal_position - self.whitening[0]) / self.whitening[1]
 
       mag = torch.norm(goal_position, p=2, dim=1).reshape((-1, 1))
       direction = goal_position / mag
@@ -158,8 +189,8 @@ class Net(nn.Module):
       # and scale the direction by the output of the network
 
       # Performing data whitening
-      planet_position = (planet_position - self.whitening_planet_position_mean) / self.whitening_planet_position_sigma
-      planet_radius = (planet_radius - self.whitening_planet_radii_mean) / self.whitening_planet_radii_sigma
+      planet_position = (planet_position - self.whitening[4]) / self.whitening[5]
+      planet_radius = (planet_radius - self.whitening[6]) / self.whitening[7]
 
       mag = torch.norm(planet_position, p=2, dim=1).reshape((-1, 1))
       direction = - planet_position / mag # Negative as we want to avoid planets
@@ -187,7 +218,7 @@ class Net(nn.Module):
       # and scale the direction by the output of the network
 
       # Performing data whitening
-      spaceship = (spaceship - self.whitening_spaceships_mean) / self.whitening_spaceships_sigma
+      spaceship = (spaceship - self.whitening[8]) / self.whitening[9]
 
       mag = torch.norm(spaceship[:, :-1], p=2, dim=1).reshape((-1, 1))
       direction = - spaceship[:, :-1] / mag # Negative as we want to avoid spaceships
@@ -215,7 +246,7 @@ class Net(nn.Module):
       # and scale the direction by the output of the network
 
       # Performing data whitening
-      meteoroid = (meteoroid - self.whitening_meteoroids_mean) / self.whitening_meteoroids_sigma
+      meteoroid = (meteoroid - self.whitening[2]) / self.whitening[3]
 
       mag = torch.norm(meteoroid[:, :-1], p=2, dim=1).reshape((-1, 1))
       direction = - meteoroid[:, :-1] / mag # Negative as we want to avoid meteoroids
