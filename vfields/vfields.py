@@ -41,12 +41,35 @@ class AnalyticalVFields(VFields):
         else:
             return 0
 
+    def _obstacle_list(self, dist, radius):
+        # Version that deals with a list/array of displacement values passed
+        velocity = np.zeros(len(dist))
+        for i in range(len(dist)):
+            if dist[i] > radius:
+                velocity[i] = self.obstacle_scale*np.exp(-(dist[i]-radius)/self.decay_radius)
+            else:
+                velocity[i] = 0
+        return velocity
+
     def _goal(self, disp):
         dist = np.linalg.norm(disp)
         if dist < self.convergence_radius:
             velocity = -disp / self.convergence_radius
         else:
             velocity = -disp / dist
+        # The below penalises tan(theta)**2, to drive to theta=0.
+        # velocity += self.alpha * (disp[0]/disp[1]**3)*np.array([disp[1], -disp[0]])
+        return velocity
+
+    def _goal_list(self, disp):
+        # Version that deals with a list/array of displacement values passed
+        velocity = np.zeros(len(disp))
+        for i in range(len(disp)):
+            dist = np.linalg.norm(disp[i])
+            if dist < self.convergence_radius:
+                velocity[i] = -disp[i] / self.convergence_radius
+            else:
+                velocity[i] = -disp[i] / dist
         # The below penalises tan(theta)**2, to drive to theta=0.
         # velocity += self.alpha * (disp[0]/disp[1]**3)*np.array([disp[1], -disp[0]])
         return velocity
