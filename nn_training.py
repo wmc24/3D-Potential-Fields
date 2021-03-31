@@ -23,11 +23,13 @@ DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 load_model = False
-loaded_model_name = 'Goal-one-obstacle-field-for-all-4-sigmoid'
-save_model_name = 'Goal-one-obstacle-field-for-all-4-sigmoid'
+loaded_model_name = 'Goal-one-obstacle-field-for-all'
+save_model_name = 'Goal-one-obstacle-field-for-all'
 tensorboard_name = save_model_name
 tensorboard_logging = False
 perform_training = True
+# Whether or not to train the subnetworks together or seperately
+combined_training = False
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
@@ -211,37 +213,38 @@ if perform_training is True:
                 if i == 1:
                     # performing data whitening
                     model.data_whitening(goal_position, planet_position, planet_radius, spaceship, meteoroid, DEVICE)
-                # Could train the sub-networks in one go but this makes it more difficult
-                """
-                optimizer.zero_grad()
-                prediction, goal_prediction, planets_prediction, spaceships_prediction, meteoroids_prediction = model.forward(goal_position.to(DEVICE).float(), 
-                                                                                                                              planet_position.to(DEVICE).float(), 
-                                                                                                                              planet_radii.to(DEVICE).float(), 
-                                                                                                                              spaceship.to(DEVICE).float(), 
-                                                                                                                              meteoroid.to(DEVICE).float())
-                velocity = #INSERT SUM
-                total_loss = loss(prediction, velocity.to(DEVICE).float())
-                total_loss.backward()
-                optimizer.step()
-                """
-                # We train the sub-networks seperately to make it as easy as possible
-                optimizer.zero_grad()
 
-                goal_prediction = model.forward_goal(goal_position.to(DEVICE).float())
-                goal_loss = loss(goal_prediction, goal_velocity.to(DEVICE).float())
+                if combined_training is True:
+                    # Could train the sub-networks in one go but this makes it more difficult
+                    optimizer.zero_grad()
+                    prediction, goal_prediction, planets_prediction, spaceships_prediction, meteoroids_prediction = model.forward(goal_position.to(DEVICE).float().reshape((batch_size, 1, -1)), 
+                                                                                                                                planet_position.to(DEVICE).float().reshape((batch_size, 1, -1)), 
+                                                                                                                                planet_radius.to(DEVICE).float().reshape((batch_size, 1, -1)), 
+                                                                                                                                spaceship.to(DEVICE).float().reshape((batch_size, 1, -1)), 
+                                                                                                                                meteoroid.to(DEVICE).float().reshape((batch_size, 1, -1)))
+                    velocity = goal_velocity + planet_velocity + spaceship_velocity + meteoroid_velocity
+                    total_loss = loss(prediction, velocity.to(DEVICE).float())
+                    total_loss.backward()
+                    optimizer.step()
+                else:
+                    # We train the sub-networks seperately to make it as easy as possible
+                    optimizer.zero_grad()
 
-                planet_prediction = model.forward_planet(planet_position.to(DEVICE).float(), planet_radius.to(DEVICE).float())
-                planet_loss = loss(planet_prediction, planet_velocity.to(DEVICE).float())
+                    goal_prediction = model.forward_goal(goal_position.to(DEVICE).float())
+                    goal_loss = loss(goal_prediction, goal_velocity.to(DEVICE).float())
 
-                spaceship_prediction = model.forward_spaceship(spaceship.to(DEVICE).float())
-                spaceship_loss = loss(spaceship_prediction, spaceship_velocity.to(DEVICE).float())
+                    planet_prediction = model.forward_planet(planet_position.to(DEVICE).float(), planet_radius.to(DEVICE).float())
+                    planet_loss = loss(planet_prediction, planet_velocity.to(DEVICE).float())
 
-                meteoroid_prediction = model.forward_meteoroid(meteoroid.to(DEVICE).float())
-                meteoroid_loss = loss(meteoroid_prediction, meteoroid_velocity.to(DEVICE).float())
+                    spaceship_prediction = model.forward_spaceship(spaceship.to(DEVICE).float())
+                    spaceship_loss = loss(spaceship_prediction, spaceship_velocity.to(DEVICE).float())
 
-                total_loss = goal_loss + 5 * planet_loss + 5 * spaceship_loss + 5 * meteoroid_loss
-                total_loss.backward()
-                optimizer.step()
+                    meteoroid_prediction = model.forward_meteoroid(meteoroid.to(DEVICE).float())
+                    meteoroid_loss = loss(meteoroid_prediction, meteoroid_velocity.to(DEVICE).float())
+
+                    total_loss = goal_loss + 5 * planet_loss + 5 * spaceship_loss + 5 * meteoroid_loss
+                    total_loss.backward()
+                    optimizer.step()
             
             # After 25K epochs, we switch the output non-linearity from
             # leaky_ReLU to ReLU

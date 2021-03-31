@@ -87,27 +87,38 @@ class Net(nn.Module):
     def forward(self, goal_position, planets_position, planets_radii, spaceships, meteoroids):
       # Computing forward passes for a general scenario input to make the network friendlier
       # to work with elsewhere
+
+      """
+      # Performing data whitening
+      goal_position = (goal_position - self.whitening_goal_mean) / self.whitening_goal_sigma
+      planets_position = (planets_position - self.whitening_planet_position_mean) / self.whitening_planet_position_sigma
+      planets_radii = (planets_radii - self.whitening_planet_radii_mean) / self.whitening_planet_radii_sigma
+      spaceships = (spaceships - self.whitening_spaceships_mean) / self.whitening_spaceships_sigma
+      meteoroids = (meteoroids - self.whitening_meteoroids_mean) / self.whitening_meteoroids_sigma
+      """
+      batch_size = goal_position.size()[0]
+      device = goal_position.get_device()
+
       if goal_position.size()[1] != 0:
-        print(goal_position.size())
-        goal_output = self.forward_goal(goal_position)
+        goal_output = self.forward_goal(goal_position.squeeze())
       else:
         goal_output = torch.zeros(self.dims)
 
-      planets_output = torch.zeros(self.dims)
+      planets_output = torch.zeros(batch_size, self.dims).to(device)
       if planets_position.size()[1] != 0:
-        for i in range(planets_position.size()[0]):
-          planets_output += self.forward_planet(planets_position[i, :], planets_radii[i, :])
+        for i in range(planets_position.size()[1]):
+          planets_output += self.forward_planet(planets_position[:, i, :].squeeze(), planets_radii[:, i, :].squeeze())
           
       # For now for spaceships and meteoroids we use the planets 
-      spaceships_output = torch.zeros(self.dims)
+      spaceships_output = torch.zeros(batch_size, self.dims).to(device)
       if spaceships.size()[1] != 0:
-        for i in range(spaceships.size()[0]):
-          spaceships_output += self.forward_spaceship(spaceships[i, :])
+        for i in range(spaceships.size()[1]):
+          spaceships_output += self.forward_spaceship(spaceships[:, i, :].squeeze())
 
-      meteoroids_output = torch.zeros(self.dims)
+      meteoroids_output = torch.zeros(batch_size, self.dims).to(device)
       if meteoroids.size()[1] != 0:
-        for i in range(meteoroids.size()[0]):
-          meteoroids_output += self.forward_meteoroid(meteoroids[i, :])
+        for i in range(meteoroids.size()[1]):
+          meteoroids_output += self.forward_meteoroid(meteoroids[:, i, :].squeeze())
 
       # Combining these together into a single output
       output = goal_output + planets_output + spaceships_output + meteoroids_output
@@ -157,7 +168,7 @@ class Net(nn.Module):
       x = self.planet_linear1(x)
       x = torch.sigmoid(x)
       x = self.planet_linear2(x)
-      x = F.leaky_relu(x)
+      x = torch.sigmoid(x)
       x = self.planet_linear3(x)
       x = F.leaky_relu(x)
       x = self.planet_linear4(x)
@@ -185,7 +196,7 @@ class Net(nn.Module):
       x = self.spaceship_linear1(x)
       x = torch.sigmoid(x)
       x = self.spaceship_linear2(x)
-      x = F.leaky_relu(x)
+      x = torch.sigmoid(x)
       x = self.spaceship_linear3(x)
       x = F.leaky_relu(x)
       x = self.spaceship_linear4(x)
@@ -213,7 +224,7 @@ class Net(nn.Module):
       x = self.meteoroid_linear1(x)
       x = torch.sigmoid(x)
       x = self.meteoroid_linear2(x)
-      x = F.leaky_relu(x)
+      x = torch.sigmoid(x)
       x = self.meteoroid_linear3(x)
       x = F.leaky_relu(x)
       x = self.meteoroid_linear4(x)
