@@ -36,7 +36,7 @@ class AnalyticalVFields(VFields):
         self.alpha = alpha
 
     def _obstacle(self, dist, radius):
-        if dist > radius:
+        if dist >= radius:
             return self.obstacle_scale*np.exp(-(dist-radius)/self.decay_radius)
         else:
             return 0
@@ -45,7 +45,7 @@ class AnalyticalVFields(VFields):
         # Version that deals with a list/array of displacement values passed
         velocity = np.zeros(len(dist))
         for i in range(len(dist)):
-            if dist[i] > radius:
+            if dist[i] >= radius:
                 velocity[i] = self.obstacle_scale*np.exp(-(dist[i]-radius)/self.decay_radius)
             else:
                 velocity[i] = 0
