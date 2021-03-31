@@ -2,6 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def whitening(x, device):
+  # Input is a tensor of (N, variable) dims
+  # returns its mean and standard deviation over the
+  # N dimension
+  means = torch.mean(x, dim=0).float().to(device)
+  sigma = torch.std(x, dim=0).float().to(device)
+  return means, sigma
+
+
 class BasicGoalNet(nn.Module):
     def __init__(self, dims):
       super(BasicGoalNet, self).__init__()
@@ -39,17 +48,35 @@ class Net(nn.Module):
       self.dims = dims
       self.leaky = True
       self.goal_linear1 = nn.Linear(1, 16)
-      self.goal_linear2 = nn.Linear(16, 16)
-      self.goal_linear3 = nn.Linear(16, 1)
+      self.goal_linear2 = nn.Linear(16, 8)
+      self.goal_linear3 = nn.Linear(8, 8)
+      self.goal_linear4 = nn.Linear(8, 1)
+
       self.planet_linear1 = nn.Linear(2, 16)
       self.planet_linear2 = nn.Linear(16, 16)
-      self.planet_linear3 = nn.Linear(16, 1)
+      self.planet_linear3 = nn.Linear(16, 8)
+      self.planet_linear4 = nn.Linear(8, 8)
+      self.planet_linear5 = nn.Linear(8, 1)
+
       self.spaceship_linear1 = nn.Linear(2, 16)
       self.spaceship_linear2 = nn.Linear(16, 16)
-      self.spaceship_linear3 = nn.Linear(16, 1)
+      self.spaceship_linear3 = nn.Linear(16, 8)
+      self.spaceship_linear4 = nn.Linear(8, 8)
+      self.spaceship_linear5 = nn.Linear(8, 1)
+
       self.meteoroid_linear1 = nn.Linear(2, 16)
       self.meteoroid_linear2 = nn.Linear(16, 16)
-      self.meteoroid_linear3 = nn.Linear(16, 1)
+      self.meteoroid_linear3 = nn.Linear(16, 8)
+      self.meteoroid_linear4 = nn.Linear(8, 8)
+      self.meteoroid_linear5 = nn.Linear(8, 1)
+
+    def data_whitening(self, goal_position, planets_position, planets_radii, spaceships, meteoroids, device):
+      # Computing a data whitening matrix for all the nets to improve training at beginning
+      self.whitening_goal_mean, self.whitening_goal_sigma = whitening(goal_position, device)
+      self.whitening_planet_position_mean, self.whitening_planet_position_sigma = whitening(planets_position, device)
+      self.whitening_planet_radii_mean, self.whitening_planet_radii_sigma = whitening(planets_radii, device)
+      self.whitening_spaceships_mean, self.whitening_spaceships_sigma = whitening(spaceships, device)
+      self.whitening_meteoroids_mean, self.whitening_meteoroids_sigma = whitening(meteoroids, device)
 
     # The passed arguements are of the dimensions:
     # goal_position - (dims)
@@ -94,14 +121,19 @@ class Net(nn.Module):
       # and scale the direction by the output of the network
       # Pass data through first linear layer
 
+      # Performing data whitening
+      goal_position = (goal_position - self.whitening_goal_mean) / self.whitening_goal_sigma
+
       mag = torch.norm(goal_position, p=2, dim=1).reshape((-1, 1))
       direction = goal_position / mag
 
       x = self.goal_linear1(mag)
-      x = F.leaky_relu(x)
+      x = torch.sigmoid(x)
       x = self.goal_linear2(x)
       x = F.leaky_relu(x)
       x = self.goal_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.goal_linear4(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
@@ -114,6 +146,10 @@ class Net(nn.Module):
       # It only depends upon the distance and radius so we get a L2 norm
       # and scale the direction by the output of the network
 
+      # Performing data whitening
+      planet_position = (planet_position - self.whitening_planet_position_mean) / self.whitening_planet_position_sigma
+      planet_radius = (planet_radius - self.whitening_planet_radii_mean) / self.whitening_planet_radii_sigma
+
       mag = torch.norm(planet_position, p=2, dim=1).reshape((-1, 1))
       direction = - planet_position / mag # Negative as we want to avoid planets
       
@@ -121,8 +157,12 @@ class Net(nn.Module):
       x = self.planet_linear1(x)
       x = torch.sigmoid(x)
       x = self.planet_linear2(x)
-      x = torch.sigmoid(x)
+      x = F.leaky_relu(x)
       x = self.planet_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.planet_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.planet_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
@@ -135,6 +175,9 @@ class Net(nn.Module):
       # It only depends upon the distance and radius so we get a L2 norm
       # and scale the direction by the output of the network
 
+      # Performing data whitening
+      spaceship = (spaceship - self.whitening_spaceships_mean) / self.whitening_spaceships_sigma
+
       mag = torch.norm(spaceship[:, :-1], p=2, dim=1).reshape((-1, 1))
       direction = - spaceship[:, :-1] / mag # Negative as we want to avoid spaceships
       
@@ -142,8 +185,12 @@ class Net(nn.Module):
       x = self.spaceship_linear1(x)
       x = torch.sigmoid(x)
       x = self.spaceship_linear2(x)
-      x = torch.sigmoid(x)
+      x = F.leaky_relu(x)
       x = self.spaceship_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.spaceship_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.spaceship_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
@@ -156,6 +203,9 @@ class Net(nn.Module):
       # It only depends upon the distance and radius so we get a L2 norm
       # and scale the direction by the output of the network
 
+      # Performing data whitening
+      meteoroid = (meteoroid - self.whitening_meteoroids_mean) / self.whitening_meteoroids_sigma
+
       mag = torch.norm(meteoroid[:, :-1], p=2, dim=1).reshape((-1, 1))
       direction = - meteoroid[:, :-1] / mag # Negative as we want to avoid meteoroids
       
@@ -163,8 +213,12 @@ class Net(nn.Module):
       x = self.meteoroid_linear1(x)
       x = torch.sigmoid(x)
       x = self.meteoroid_linear2(x)
-      x = torch.sigmoid(x)
+      x = F.leaky_relu(x)
       x = self.meteoroid_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.meteoroid_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.meteoroid_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:

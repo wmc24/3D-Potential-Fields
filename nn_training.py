@@ -23,22 +23,22 @@ DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 load_model = False
-loaded_model_name = 'Goal-one-obstacle-field-for-all'
-save_model_name = 'Goal-one-obstacle-field-for-all'
+loaded_model_name = 'Goal-one-obstacle-field-for-all-4-sigmoid'
+save_model_name = 'Goal-one-obstacle-field-for-all-4-sigmoid'
 tensorboard_name = save_model_name
-tensorboard_logging = True
+tensorboard_logging = False
 perform_training = True
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
 num_epochs = None
-learning_rate = 1e-5
-batch_size = 25
+learning_rate = 1e-2
+batch_size = 100
 batch_size_doubling_epochs = [50000, 100000]
 
 # How many epochs to save things
 model_epochs = 1000
-model_checkpoint_epochs = 50000
+model_checkpoint_epochs = 10000
 
 # Dimension of scenario
 DIMENSIONS = 3
@@ -51,16 +51,7 @@ DIMENSIONS = 3
 """-------------------------------------------------------------------------"""
 
 
-# Modifying default format to avoid characters that shouldn't be used in filenames
-t = datetime.datetime.now()
-date = t.date()
-hour = str(t.hour).zfill(2)
-minute = str(t.minute).zfill(2)
-second = str(t.second).zfill(2)
-run_datestamp = f'{date} {hour}_{minute}_{second}'
-
 if perform_training is True and tensorboard_logging is True:
-    tensorboard_name = f'{run_datestamp} {tensorboard_name}'
     writer = SummaryWriter(log_dir='logs')
 
 save_dir = os.path.join('models', f'{save_model_name}.tar')
@@ -145,7 +136,7 @@ class Dataset(BaseDataset):
         goal = Goal(goal_position, goal_position/np.linalg.norm(goal_position))
         goal_velocity = self.vfields.goal(position, goal)
 
-        # Generating a random planet position and radius using a uniform distribution and its associated velocity
+        # Generating a random planet position and radius using a weighted uniform distribution and its associated velocity
         planet_radius = np.random.uniform(40, 200)
         if np.random.uniform() < 0.75:
             dist_to_planet = np.random.uniform(planet_radius, self.size_of_universe/4)
@@ -160,7 +151,7 @@ class Dataset(BaseDataset):
             planet_position = np.array([dist_to_planet*np.cos(theta)*np.cos(phi), dist_to_planet*np.sin(theta)*np.cos(phi), dist_to_planet*np.sin(phi)])
         planet_velocity = self.vfields.obstacle(position, planet_position, planet_radius)
 
-        # Generating a random spaceship position and radius using a uniform distribution and its associated velocity
+        # Generating a random spaceship position and radius using a weighted uniform distribution and its associated velocity
         spaceship_size = np.random.uniform(10, 20)
         if np.random.uniform() < 0.75:
             dist_to_spaceship = np.random.uniform(spaceship_size/2, self.size_of_universe/4)
@@ -176,7 +167,7 @@ class Dataset(BaseDataset):
         spaceship_velocity = self.vfields.obstacle(position, spaceship_position, spaceship_size)
         spaceship = np.concatenate((spaceship_position, spaceship_size), axis=None)
 
-        # Generating a random meteoroid position and radius using a uniform distribution and its associated velocity
+        # Generating a random meteoroid position and radius using a weighted uniform distribution and its associated velocity
         meteoroid_size = np.random.uniform(10, 20)
         if np.random.uniform() < 0.75:
             dist_to_meteoroid = np.random.uniform(meteoroid_size/2, self.size_of_universe/4)
@@ -217,6 +208,9 @@ if perform_training is True:
         while True:
             # Perfoming training
             for index, (goal_position, planet_position, planet_radius, spaceship, meteoroid, goal_velocity, planet_velocity, spaceship_velocity, meteoroid_velocity) in enumerate(dataloader):
+                if i == 1:
+                    # performing data whitening
+                    model.data_whitening(goal_position, planet_position, planet_radius, spaceship, meteoroid, DEVICE)
                 # Could train the sub-networks in one go but this makes it more difficult
                 """
                 optimizer.zero_grad()
@@ -245,7 +239,7 @@ if perform_training is True:
                 meteoroid_prediction = model.forward_meteoroid(meteoroid.to(DEVICE).float())
                 meteoroid_loss = loss(meteoroid_prediction, meteoroid_velocity.to(DEVICE).float())
 
-                total_loss = goal_loss + planet_loss + spaceship_loss + meteoroid_loss
+                total_loss = goal_loss + 5 * planet_loss + 5 * spaceship_loss + 5 * meteoroid_loss
                 total_loss.backward()
                 optimizer.step()
             
@@ -257,10 +251,11 @@ if perform_training is True:
                 except:
                     pass
 
-            # After 1k epochs we increase the learning rate
-            if i % 1000 == 0:
+            # After 200k epochs we reduce the learning rate
+            if i % 200000 == 0:
                 for g in optimizer.param_groups:
-                    g['lr'] = 1e-4
+                    learning_rate = learning_rate / 10
+                    g['lr'] = learning_rate
             
             # Writing values to tensorboard
             if (i % 100 == 0 or i == 1):
@@ -276,8 +271,11 @@ if perform_training is True:
                     spaceship_velocity = spaceship_velocity.numpy()
                     meteoroid_velocity = meteoroid_velocity.numpy()
                     velocity = goal_velocity + planet_velocity + spaceship_velocity + meteoroid_velocity
+
+                    writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
+                    writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
+                    writer.add_scalar(f'{tensorboard_name}/8 - Learning Rate', learning_rate, global_step=i)
                     if DIMENSIONS == 2:
-                        writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
                         writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
                                         {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
                                         'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
@@ -308,9 +306,7 @@ if perform_training is True:
                                         'x - median': np.median(np.abs(meteoroid_velocity[:, 0] - meteoroid_prediction[:, 0])),
                                         'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1]))},
                                         global_step=i)
-                        writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
                     else:
-                        writer.add_scalar(f'{tensorboard_name}/1 - Total Loss - MSE', total_loss, global_step=i)
                         writer.add_scalars(f'{tensorboard_name}/2 - Absolute Velocity Errors (m/s)',
                                         {'x - mean': np.mean(np.abs(velocity[:, 0] - prediction[:, 0])),
                                         'y - mean': np.mean(np.abs(velocity[:, 1] - prediction[:, 1])),
@@ -351,7 +347,6 @@ if perform_training is True:
                                         'y - median': np.median(np.abs(meteoroid_velocity[:, 1] - meteoroid_prediction[:, 1])),
                                         'z - median': np.median(np.abs(meteoroid_velocity[:, 2] - meteoroid_prediction[:, 2]))},
                                         global_step=i)
-                        writer.add_scalar(f'{tensorboard_name}/7 - Batch Size', batch_size, global_step=i)
             
             # Doubling the batch size at fixed epochs
             if i in batch_size_doubling_epochs:
