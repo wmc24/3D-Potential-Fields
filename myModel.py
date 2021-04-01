@@ -4,10 +4,9 @@ import torch.nn.functional as F
 
 def whitening(x, device):
   # Input is a tensor of (N, variable) dims
-  # returns its mean and standard deviation over the
-  # N dimension
-  means = torch.mean(x, dim=0).float().to(device)
-  sigma = torch.std(x, dim=0).float().to(device)
+  # returns its mean and standard deviation
+  means = torch.mean(x).float().to(device)
+  sigma = torch.std(x).float().to(device)
   return means, sigma
 
 
@@ -19,16 +18,20 @@ class BasicGoalNet(nn.Module):
       # of the goal to the spaceship - it is simple so it is easy to train
       self.linear1 = nn.Linear(dims, 16)
       self.linear2 = nn.Linear(16, dims)
+      self.whitening = None
 
     # The passed arguements are of the dimensions:
-    # goal_position - (dims)
-    # planet_positions - (N, dims)
+    # goal_disp - (dims)
+    # planet_disps - (N, dims)
     # planet_radii - (N, 1)
     # spaceships - (N, dims*2)
     # meteoroids - (N, dims*2)
-    def forward(self, goal_position, planets_position, planets_radii, spaceships, meteoroids):
+    def forward(self, goal_disp, planets_dist, planets_radii, spaceships, meteoroids):
+      pass
+    
+    def forward_goal(self, goal_disp):
       # Pass data through first linear layer
-      x = self.linear1(goal_position)
+      x = self.linear1(goal_disp)
       # Use leaky ReLU
       x = F.leaky_relu(x)
       # Pass data through second linear layer
@@ -37,9 +40,16 @@ class BasicGoalNet(nn.Module):
       # the output by the max speed - NOT IMPLEMENTED
       output = torch.tanh(x)
 
-      goal_output = output
+      return output
 
-      return output, goal_output
+    def forward_obstacle(self, dist, size):
+      return 0
+    
+    def switch_nonlinearity(self):
+      pass
+
+    def data_whitening(self, goal_disp, planets_dist, planets_radii, spaceships_dist, spaceships_size, meteoroid_dist, meteoroid_size, device):
+      pass
 
 
 class Net(nn.Module):
@@ -47,135 +57,74 @@ class Net(nn.Module):
       super(Net, self).__init__()
       self.dims = dims
       self.leaky = True
-      self.goal_linear1 = nn.Linear(1, 16)
-      self.goal_linear2 = nn.Linear(16, 8)
-      self.goal_linear3 = nn.Linear(8, 8)
-      self.goal_linear4 = nn.Linear(8, 1)
+      self.num_neurons1 = 16
+      self.num_neurons2 = 4
 
-      self.planet_linear1 = nn.Linear(2, 16)
-      self.planet_linear2 = nn.Linear(16, 16)
-      self.planet_linear3 = nn.Linear(16, 8)
-      self.planet_linear4 = nn.Linear(8, 8)
-      self.planet_linear5 = nn.Linear(8, 1)
+      self.goal_linear1 = nn.Linear(1, self.num_neurons1)
+      self.goal_linear2 = nn.Linear(self.num_neurons1, self.num_neurons1)
+      self.goal_linear3 = nn.Linear(self.num_neurons1, self.num_neurons2)
+      self.goal_linear4 = nn.Linear(self.num_neurons2, self.num_neurons2)
+      self.goal_linear5 = nn.Linear(self.num_neurons2, 1)
+      #self.goal_linear6 = nn.Linear(1, 1, bias=False)
 
-      self.spaceship_linear1 = nn.Linear(2, 16)
-      self.spaceship_linear2 = nn.Linear(16, 16)
-      self.spaceship_linear3 = nn.Linear(16, 8)
-      self.spaceship_linear4 = nn.Linear(8, 8)
-      self.spaceship_linear5 = nn.Linear(8, 1)
-
-      self.meteoroid_linear1 = nn.Linear(2, 16)
-      self.meteoroid_linear2 = nn.Linear(16, 16)
-      self.meteoroid_linear3 = nn.Linear(16, 8)
-      self.meteoroid_linear4 = nn.Linear(8, 8)
-      self.meteoroid_linear5 = nn.Linear(8, 1)
+      self.obstacle_linear1 = nn.Linear(2, self.num_neurons1)
+      self.obstacle_linear2 = nn.Linear(self.num_neurons1, self.num_neurons1)
+      self.obstacle_linear3 = nn.Linear(self.num_neurons1, self.num_neurons2)
+      self.obstacle_linear4 = nn.Linear(self.num_neurons2, self.num_neurons2)
+      self.obstacle_linear5 = nn.Linear(self.num_neurons2, 1)
+      self.obstacle_cap = nn.Hardtanh(-1000, 1000)
 
       self.whitening_goal_mean = 0
       self.whitening_goal_sigma = 1
-      self.whitening_planet_position_mean = 0
-      self.whitening_planet_position_sigma = 1
-      self.whitening_planet_radii_mean = 0
-      self.whitening_planet_radii_sigma = 1
-      self.whitening_spaceships_mean = 0
-      self.whitening_spaceships_sigma = 1
-      self.whitening_meteoroids_mean = 0
-      self.whitening_meteoroids_sigma = 1    
+      self.whitening_obstacle_mean = 0
+      self.whitening_obstacle_sigma = 1
+      self.whitening_obstacle_size_mean = 0
+      self.whitening_obstacle_size_sigma = 1
+
       self.whitening = (self.whitening_goal_mean,
                         self.whitening_goal_sigma,
-                        self.whitening_meteoroids_mean,
-                        self.whitening_meteoroids_sigma,
-                        self.whitening_planet_position_mean,
-                        self.whitening_planet_position_sigma,
-                        self.whitening_planet_radii_mean,
-                        self.whitening_planet_radii_sigma,
-                        self.whitening_spaceships_mean,
-                        self.whitening_spaceships_sigma)
+                        self.whitening_obstacle_mean,
+                        self.whitening_obstacle_sigma,
+                        self.whitening_obstacle_size_mean,
+                        self.whitening_obstacle_size_sigma)
 
-    def data_whitening(self, goal_position, planets_position, planets_radii, spaceships, meteoroids, device):
+    def data_whitening(self, goal_disp, planets_dist, planets_radii, spaceships_dist, spaceships_size, meteoroids_dist, meteoroids_size, device):
       # Computing a data whitening matrix for all the nets to improve training at beginning
-      self.whitening_goal_mean, self.whitening_goal_sigma = whitening(goal_position, device)
-      self.whitening_planet_position_mean, self.whitening_planet_position_sigma = whitening(planets_position, device)
-      self.whitening_planet_radii_mean, self.whitening_planet_radii_sigma = whitening(planets_radii, device)
-      self.whitening_spaceships_mean, self.whitening_spaceships_sigma = whitening(spaceships, device)
-      self.whitening_meteoroids_mean, self.whitening_meteoroids_sigma = whitening(meteoroids, device)
+      self.whitening_goal_mean, self.whitening_goal_sigma = whitening(torch.norm(goal_disp, dim=1, p=2).reshape((-1, 1)), device)
+      obstacle_dists = torch.cat((planets_dist, spaceships_dist, meteoroids_dist))
+      self.whitening_obstacle_mean, self.whitening_obstacle_sigma = whitening(obstacle_dists, device)
+      obstacle_sizes = torch.cat((planets_radii, spaceships_size, meteoroids_size))
+      self.whitening_obstacle_size_mean, self.whitening_obstacle_size_sigma = whitening(obstacle_sizes, device)
       self.whitening = (self.whitening_goal_mean,
                         self.whitening_goal_sigma,
-                        self.whitening_meteoroids_mean,
-                        self.whitening_meteoroids_sigma,
-                        self.whitening_planet_position_mean,
-                        self.whitening_planet_position_sigma,
-                        self.whitening_planet_radii_mean,
-                        self.whitening_planet_radii_sigma,
-                        self.whitening_spaceships_mean,
-                        self.whitening_spaceships_sigma)
-
-    # The passed arguements are of the dimensions:
-    # goal_position - (dims)
-    # planet_positions - (N, dims)
-    # planet_radii - (N, 1)
-    # spaceships - (N, dims*2)
-    # meteoroids - (N, dims*2)
-    def forward(self, goal_position, planets_position, planets_radii, spaceships, meteoroids):
-      # Computing forward passes for a general scenario input to make the network friendlier
-      # to work with elsewhere
-
-      """
-      # Performing data whitening
-      goal_position = (goal_position - self.whitening_goal_mean) / self.whitening_goal_sigma
-      planets_position = (planets_position - self.whitening_planet_position_mean) / self.whitening_planet_position_sigma
-      planets_radii = (planets_radii - self.whitening_planet_radii_mean) / self.whitening_planet_radii_sigma
-      spaceships = (spaceships - self.whitening_spaceships_mean) / self.whitening_spaceships_sigma
-      meteoroids = (meteoroids - self.whitening_meteoroids_mean) / self.whitening_meteoroids_sigma
-      """
-      batch_size = goal_position.size()[0]
-      device = goal_position.get_device()
-
-      if goal_position.size()[1] != 0:
-        goal_output = self.forward_goal(goal_position.squeeze())
-      else:
-        goal_output = torch.zeros(self.dims)
-
-      planets_output = torch.zeros(batch_size, self.dims).to(device)
-      if planets_position.size()[1] != 0:
-        for i in range(planets_position.size()[1]):
-          planets_output += self.forward_planet(planets_position[:, i, :].squeeze(), planets_radii[:, i, :].squeeze())
-          
-      # For now for spaceships and meteoroids we use the planets 
-      spaceships_output = torch.zeros(batch_size, self.dims).to(device)
-      if spaceships.size()[1] != 0:
-        for i in range(spaceships.size()[1]):
-          spaceships_output += self.forward_spaceship(spaceships[:, i, :].squeeze())
-
-      meteoroids_output = torch.zeros(batch_size, self.dims).to(device)
-      if meteoroids.size()[1] != 0:
-        for i in range(meteoroids.size()[1]):
-          meteoroids_output += self.forward_meteoroid(meteoroids[:, i, :].squeeze())
-
-      # Combining these together into a single output
-      output = goal_output + planets_output + spaceships_output + meteoroids_output
-
-      # Returning multiple outputs for tensorboard plotting
-      return output, goal_output, planets_output, spaceships_output, meteoroids_output
+                        self.whitening_obstacle_mean,
+                        self.whitening_obstacle_sigma,
+                        self.whitening_obstacle_size_mean,
+                        self.whitening_obstacle_size_sigma)
     
-    def forward_goal(self, goal_position):
+    def forward_goal(self, goal_disp):
       # Computing the forward pass for a goal potential only
-      # It only depends upon the distance so we get a L2 norm
+      # It only depends upon the dispance so we get a L2 norm
       # and scale the direction by the output of the network
       # Pass data through first linear layer
 
+      dist = torch.norm(goal_disp, dim=1, p=2).reshape((-1, 1))
+      dist = torch.where(dist == 0.0, torch.tensor(1.0).to(dist.get_device()), dist)
+      dist_cat = torch.cat((dist, dist, dist), dim=1)
+      direction = -torch.div(goal_disp, dist_cat)
+
       # Performing data whitening
-      goal_position = (goal_position - self.whitening[0]) / self.whitening[1]
+      dist = (dist - self.whitening[0]) / self.whitening[1]
 
-      mag = torch.norm(goal_position, p=2, dim=1).reshape((-1, 1))
-      direction = goal_position / mag
-
-      x = self.goal_linear1(mag)
-      x = torch.sigmoid(x)
+      x = self.goal_linear1(dist)
+      x = F.leaky_relu(x)
       x = self.goal_linear2(x)
       x = F.leaky_relu(x)
       x = self.goal_linear3(x)
       x = F.leaky_relu(x)
       x = self.goal_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.goal_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
@@ -183,90 +132,33 @@ class Net(nn.Module):
 
       return direction * x
 
-    def forward_planet(self, planet_position, planet_radius):
+    def forward_obstacle(self, dist, size):
       # Computing the forward pass for a single planet potential only
       # It only depends upon the distance and radius so we get a L2 norm
       # and scale the direction by the output of the network
 
       # Performing data whitening
-      planet_position = (planet_position - self.whitening[4]) / self.whitening[5]
-      planet_radius = (planet_radius - self.whitening[6]) / self.whitening[7]
-
-      mag = torch.norm(planet_position, p=2, dim=1).reshape((-1, 1))
-      direction = - planet_position / mag # Negative as we want to avoid planets
+      dist = (dist - self.whitening[2]) / self.whitening[3]
+      size = (size - self.whitening[4]) / self.whitening[5]
       
-      x = torch.cat((mag, planet_radius.reshape((-1, 1))), dim=1)
-      x = self.planet_linear1(x)
-      x = torch.sigmoid(x)
-      x = self.planet_linear2(x)
-      x = torch.sigmoid(x)
-      x = self.planet_linear3(x)
+      #x = torch.cat((dist.reshape((-1, 1)) - size.reshape((-1, 1)), size.reshape((-1, 1))), dim=1)
+      x = torch.cat((dist.reshape((-1, 1)), size.reshape((-1, 1))), dim=1)
+      x = self.obstacle_linear1(x)
       x = F.leaky_relu(x)
-      x = self.planet_linear4(x)
+      x = self.obstacle_linear2(x)
       x = F.leaky_relu(x)
-      x = self.planet_linear5(x)
+      x = self.obstacle_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.obstacle_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.obstacle_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
         x = F.relu(x)
+      x = self.obstacle_cap(x)
 
-      return direction * x
-    
-    def forward_spaceship(self, spaceship):
-      # Computing the forward pass for a single planet spaceship only
-      # It only depends upon the distance and radius so we get a L2 norm
-      # and scale the direction by the output of the network
-
-      # Performing data whitening
-      spaceship = (spaceship - self.whitening[8]) / self.whitening[9]
-
-      mag = torch.norm(spaceship[:, :-1], p=2, dim=1).reshape((-1, 1))
-      direction = - spaceship[:, :-1] / mag # Negative as we want to avoid spaceships
-      
-      x = torch.cat((mag, spaceship[:, -1].reshape((-1, 1))), dim=1)
-      x = self.spaceship_linear1(x)
-      x = torch.sigmoid(x)
-      x = self.spaceship_linear2(x)
-      x = torch.sigmoid(x)
-      x = self.spaceship_linear3(x)
-      x = F.leaky_relu(x)
-      x = self.spaceship_linear4(x)
-      x = F.leaky_relu(x)
-      x = self.spaceship_linear5(x)
-      if self.leaky is True and self.training is True:
-        x = F.leaky_relu(x)
-      else:
-        x = F.relu(x)
-
-      return direction * x
-
-    def forward_meteoroid(self, meteoroid):
-      # Computing the forward pass for a single planet spaceship only
-      # It only depends upon the distance and radius so we get a L2 norm
-      # and scale the direction by the output of the network
-
-      # Performing data whitening
-      meteoroid = (meteoroid - self.whitening[2]) / self.whitening[3]
-
-      mag = torch.norm(meteoroid[:, :-1], p=2, dim=1).reshape((-1, 1))
-      direction = - meteoroid[:, :-1] / mag # Negative as we want to avoid meteoroids
-      
-      x = torch.cat((mag, meteoroid[:, -1].reshape((-1, 1))), dim=1)
-      x = self.meteoroid_linear1(x)
-      x = torch.sigmoid(x)
-      x = self.meteoroid_linear2(x)
-      x = torch.sigmoid(x)
-      x = self.meteoroid_linear3(x)
-      x = F.leaky_relu(x)
-      x = self.meteoroid_linear4(x)
-      x = F.leaky_relu(x)
-      x = self.meteoroid_linear5(x)
-      if self.leaky is True and self.training is True:
-        x = F.leaky_relu(x)
-      else:
-        x = F.relu(x)
-        
-      return direction * x
+      return x
     
     def switch_nonlinearity(self):
       # if enough training has occured we switch the non-linearity
