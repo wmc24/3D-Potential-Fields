@@ -23,12 +23,12 @@ from torch.utils.data import Dataset as BaseDataset
 DATA_DIR = 'dataset'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-load_model = False
+load_model = True
 loaded_model_name = 'Goal-one-obstacle-field-for-all'
 save_model_name = 'Goal-one-obstacle-field-for-all'
 tensorboard_name = save_model_name
-tensorboard_logging = True
-perform_training = True
+tensorboard_logging = False
+perform_training = False
 # Whether or not to train the subnetworks together or seperately
 combined_training = False
 
@@ -78,7 +78,7 @@ model = myModel.Net(dims=DIMENSIONS)
 
 if load_model is True:
     # Loading the model weights
-    checkpoint = torch.load(load_dir)
+    checkpoint = torch.load(load_dir, map_location=DEVICE)
     epoch = checkpoint['epoch']
     epoch_start = epoch
     load_dims = checkpoint['dims']
@@ -315,7 +315,6 @@ if perform_training is True:
                 plot_dir = os.path.join('plots', f'{epoch}_goal_{save_model_name}')
                 plt.savefig(plot_dir)
                 plt.close()
-                #exit()
 
                 fig, axs = plt.subplots(3)
                 j = 0
@@ -422,3 +421,28 @@ if perform_training is True:
 
 if perform_training is True and tensorboard_logging is True:
     writer.flush()
+
+x = np.linspace(0, size_of_universe/2, 1000).reshape((-1, 1))
+y = np.zeros(np.shape(x))
+disp = np.concatenate((-x, y), axis=1)
+if DIMENSIONS == 3:
+    disp = np.concatenate((disp, y), axis=1)
+velocity = model.forward_goal(torch.tensor(disp).to(DEVICE).float()).detach().cpu().numpy()
+gt_velocity = vfields._goal_list(disp)
+fig, axs = plt.subplots(2)
+axs[0].plot(x, velocity[:, 0], label=f'Predicted')
+axs[0].plot(x, gt_velocity[:, 0], label=f'Ground Truth')
+axs[1].plot(x, velocity[:, 0], label=f'Predicted')
+axs[1].plot(x, gt_velocity[:, 0], label=f'Ground Truth')
+plt.xlabel('Displacement')
+axs[0].set_ylabel('Speed')
+axs[1].set_ylabel('Speed')
+axs[0].set_xlim([0, 1000])
+axs[1].set_xlim([0, 40])
+axs[1].set_ylim([0, 1.5])
+axs[1].legend()
+axs[0].legend()
+plt.legend(loc='center right')
+plot_dir = os.path.join('debugging')
+plt.savefig(plot_dir)
+plt.close()

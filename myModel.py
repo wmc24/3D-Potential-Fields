@@ -53,7 +53,7 @@ class BasicGoalNet(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, dims):
+    def __init__(self, dims=3):
       super(Net, self).__init__()
       self.dims = dims
       self.leaky = True
@@ -109,8 +109,10 @@ class Net(nn.Module):
       # Pass data through first linear layer
 
       dist = torch.norm(goal_disp, dim=1, p=2).reshape((-1, 1))
-      dist = torch.where(dist == 0.0, torch.tensor(1.0).to(dist.get_device()), dist)
-      dist_cat = torch.cat((dist, dist, dist), dim=1)
+      dist = torch.where(dist == 0.0, torch.tensor(1.0).to(dist.device), dist)
+      dist_cat = torch.cat((dist, dist), dim=1)
+      if goal_disp.size()[1] == 3:
+        dist_cat = torch.cat((dist_cat, dist), dim=1)
       direction = -torch.div(goal_disp, dist_cat)
 
       # Performing data whitening
