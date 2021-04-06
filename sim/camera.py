@@ -46,7 +46,7 @@ class Camera2D:
 
     # For placing mouse position on world
     def untransform_position(self, screen_pos):
-        screen_pos = np.array(screen_pos)
+        screen_pos = np.array(screen_pos, dtype=np.float64)
         screen_pos -= self.screen_centre
         screen_pos[1] = -screen_pos[1]
         return self.pos + np.matmul(self.R, screen_pos)*self.scale

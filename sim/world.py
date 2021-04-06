@@ -17,11 +17,11 @@ def get_random_meteoroid_trajectory(size, padding=0):
     pos = 0.5*direction*size[side]
     for i in range(N):
         if i==side: continue
-        pos[i] += (-0.5+np.random.random())*size[i] + sign*padding
+        pos[i] += (-0.2+0.4*np.random.random())*size[i] + sign*padding
     direction = -direction
     for i in range(N):
         if i==side: continue
-        angle = -0.5+np.random.random() # About -30 -> 30 degrees
+        angle = -0.2+0.4*np.random.random() # About -30 -> 30 degrees
         direction[i] = np.sin(angle)
     return pos, direction
 
@@ -43,7 +43,7 @@ class Entity(object):
 # For planets and meteoroids. Meteroids are destructable
 class Obstacle(Entity):
     def __init__(self, pos, radius, velocity=None, destructable=False):
-        super(Obstacle,self).__init__(pos, radius)
+        super().__init__(pos, radius)
         if velocity is None:
             velocity = np.zeros_like(pos)
         self.velocity = velocity
@@ -59,7 +59,7 @@ class Obstacle(Entity):
 
 class Agent(Entity):
     def __init__(self, pos, radius, max_speed, max_angular_speed, resource, log_size=0):
-        super(Agent,self).__init__(pos, radius)
+        super().__init__(pos, radius)
         self.max_speed = max_speed
         self.max_angular_speed = max_angular_speed
         self.velocity = np.zeros(pos.shape)
@@ -80,7 +80,8 @@ class Agent(Entity):
             self.log_poses = np.zeros((6, log_size))
 
     def update(self, dt):
-        self.pose.move_using_holonomic_point(self.velocity, self.max_speed, self.max_angular_speed, dt)
+        perturbed_vel = self.velocity + np.random.normal(0, 0.05)
+        self.pose.move_using_holonomic_point(perturbed_vel, self.max_speed, self.max_angular_speed, dt)
         self.pos = self.pose.pos
         if self.goal is not None and self.goal.reached(self.pose):
             self.goal = None
@@ -160,16 +161,17 @@ class World:
     def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
         for obstacle in self.obstacles:
-            velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius)
+            if np.linalg.norm(obstacle.velocity) == 0:
+                velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius)
+            else:
+                velocity += self.vfields.moving_obstacle(pos, obstacle.pos, obstacle.radius, obstacle.velocity)
         for other_agent in self.agents:
             if agent is None or agent != other_agent:
                 velocity += self.vfields.obstacle(pos, other_agent.pos, other_agent.radius)
         if agent is not None and agent.goal is not None:
             velocity += self.vfields.goal(pos, agent.goal)
 
-        # The above gives a "normalised" field. Scale with speed, such that
-        # a speed of 1, gives a speed of "speed"
-        velocity *= speed * 0.1
+        velocity *= speed
         return velocity
 
     def set_new_goal(self, agent):
@@ -188,7 +190,7 @@ class World:
     def spawn_meteoroid(self):
         radius = 20 + np.random.random()*20
         pos, direction = get_random_meteoroid_trajectory(self.size, radius)
-        speed = 500 + np.random.random()*1500
+        speed = 600
         self.obstacles.append(Obstacle(pos, radius, speed*direction, True))
 
     def update(self, dt):

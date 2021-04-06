@@ -29,10 +29,10 @@ class Window:
         self.world = world
 
         if self.world.N == 2:
-            self.camera = Camera2D(np.array([width/2, height/2]))
+            self.camera = Camera2D(np.array([width/2, height/2], dtype=np.float64))
             self.camera.scale = 2
         else:
-            self.camera = Camera3D(np.array([width/2, height/2]))
+            self.camera = Camera3D(np.array([width/2, height/2], dtype=np.float64))
 
         self.paused = False
         self.active_agent = None

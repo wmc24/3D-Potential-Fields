@@ -12,19 +12,19 @@ class WorldConfig:
     def __init__(self, N=2):
         self.N = N
         self.width = 2000
-        self.max_speed = 2000
-        self.max_angular_speed = 3
+        self.max_speed = 500
+        self.max_angular_speed = np.pi*2
         self.agent_radius = 20
         self.planet_radii_range = (60, 200) # Not enforced at the moment
         self.meteoroid_radii_range = (30, 80) # Not enforced ..
         self.meteoroid_speed_range = (3000, 5000) # Not enforced ..
-        self.resources = ["Oil", "Iron", "Water", "Copper", "Hydrogen", "Silicon"]
+        self.resources = ["Oil", "Iron", "Water"]#, "Copper", "Hydrogen", "Silicon"]
         # pygame can use "#rgb" or (r,g,b)
         # Plotting needs "#rgb", only done for 2D
         # 3D rendering needs (r,g,b)
         # Therefore, use "#rgb" for 2D, (r,g,b) for 3D, as a quick fix
-        self.resource_colors_2d = ["#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff"]
-        self.resource_colors_3d = [(255,0,0), (0,255,0), (0,0,255), (255,255,0), (0,255,255), (255,0,255)]
+        self.resource_colors_2d = ["#ff0000", "#00ff00", "#0000ff"]#, "#ffff00", "#00ffff", "#ff00ff"]
+        self.resource_colors_3d = [(255,0,0), (0,255,0), (0,0,255)]#, (255,255,0), (0,255,255), (255,0,255)]
 
     def resource_color(self, i):
         if self.N==2:
@@ -86,15 +86,16 @@ def main():
 
     config = WorldConfig(args.N)
 
+    weights = [0.4, 0.8, 1.2]
     if args.vfields == "analytical":
         vfields = AnalyticalVFields(
-            decay_radius=20,
+            weights=weights,
+            decay_radius=30,
             convergence_radius=20,
-            obstacle_scale=5,
             alpha=10
         )
     else:
-        vfields = NeuralNetVFields() # TODO
+        vfields = NeuralNetVFields(weights)
 
     world = create_world(vfields, config)
 
@@ -103,6 +104,7 @@ def main():
         clock = pg.time.Clock()
         while True:
             dt = clock.tick()/1000.0
+            if (dt > 0.1): dt = 0 # For when unpausing
             if window.update(dt):
                 break
             window.draw()
