@@ -86,7 +86,7 @@ def main():
 
     config = WorldConfig(args.N)
 
-    weights = [0.4, 0.8, 1.2]
+    weights = [0.5, 1, 1]
     if args.vfields == "analytical":
         vfields = AnalyticalVFields(
             weights=weights,

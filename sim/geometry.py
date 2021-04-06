@@ -71,7 +71,8 @@ class Pose3D(object):
 
         if abs(dtheta) > max_angular_speed:
             dtheta = max_angular_speed * np.sign(dtheta)
-        self.R = np.matmul(np.eye(3) + S*np.sin(dtheta*dt) + np.matmul(S,S)*(1 - np.cos(dtheta*dt)), self.R)
+        dtheta *= dt
+        self.R = np.matmul(np.eye(3) + S*np.sin(dtheta) + np.matmul(S,S)*(1 - np.cos(dtheta)), self.R)
 
     def get_vector(self):
         return np.concatenate([self.pos, self.R[:,0]])
