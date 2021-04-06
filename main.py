@@ -15,9 +15,9 @@ class WorldConfig:
         self.max_speed = 500
         self.max_angular_speed = np.pi*2
         self.agent_radius = 20
-        self.planet_radii_range = (60, 200) # Not enforced at the moment
-        self.meteoroid_radii_range = (30, 80) # Not enforced ..
-        self.meteoroid_speed_range = (3000, 5000) # Not enforced ..
+        self.planet_radii_range = (60, 200) # Not enforced
+        self.meteoroid_radii_range = (20, 40) # Not enforced
+        self.meteoroid_speed_range = (500, 700) # Not enforced ..
         self.resources = ["Oil", "Iron", "Water"]#, "Copper", "Hydrogen", "Silicon"]
         # pygame can use "#rgb" or (r,g,b)
         # Plotting needs "#rgb", only done for 2D
@@ -86,7 +86,7 @@ def main():
 
     config = WorldConfig(args.N)
 
-    weights = [0.5, 1, 1]
+    weights = [0.5, 1.1, 1]
     if args.vfields == "analytical":
         vfields = AnalyticalVFields(
             weights=weights,

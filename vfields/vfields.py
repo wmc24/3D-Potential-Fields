@@ -42,8 +42,8 @@ class VFields(object):
             u2 = disp2 / disp2_comp
             relative_disp = np.array([disp1_comp-obstacle_radius, disp2_comp])
             # Use 2*moving_obstacle for a larger margin of error
-            relative_vel = self._moving_obstacle(relative_disp, 2*obstacle_radius, np.linalg.norm(obstacle_vel))
-            return self.weights[2]*(u1*relative_vel[0] + u2*relative_vel[1])
+            side_vel = self._moving_obstacle(relative_disp, 2*obstacle_radius, np.linalg.norm(obstacle_vel))
+            return self.weights[2]*u2*side_vel
         return np.zeros_like(pos)
 
     def _moving_obstacle(self, disp, obstacle_radius, speed):
@@ -99,7 +99,7 @@ class AnalyticalVFields(VFields):
         else:
             avoid_speed = np.exp(-(abs(disp[1])-obstacle_radius)/self.decay_radius)
         side_vel = np.sign(disp[1]) * np.exp(-urgency) * avoid_speed
-        return np.array([0, side_vel])
+        return side_vel
 
     def _moving_obstacle_list(self, disp, obstacle_radius, speed):
         # Version that deals with a list/array of displacement values passed

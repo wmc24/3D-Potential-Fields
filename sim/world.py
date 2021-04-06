@@ -122,7 +122,7 @@ class World:
         self.vfields = vfields
         self.agents = []
         self.obstacles = []
-        self.meteoroid_spawn_rate = 1
+        self.meteoroid_spawn_rate = 2 
         self.meteoroid_spawn_timer = 0
         self.meteoroid_enable = False
         self.set_meteoroid_spawn_time()
