@@ -17,11 +17,11 @@ def get_random_meteoroid_trajectory(size, padding=0):
     pos = 0.5*direction*size[side]
     for i in range(N):
         if i==side: continue
-        pos[i] += (-0.2+0.4*np.random.random())*size[i] + sign*padding
+        pos[i] += (-0.25+0.5*np.random.random())*size[i] + sign*padding
     direction = -direction
     for i in range(N):
         if i==side: continue
-        angle = -0.2+0.4*np.random.random() # About -30 -> 30 degrees
+        angle = -0.3+0.6*np.random.random()
         direction[i] = np.sin(angle)
     return pos, direction
 
@@ -161,9 +161,8 @@ class World:
     def get_velocity_field(self, pos, speed, agent=None):
         velocity = np.zeros(len(self.size))
         for obstacle in self.obstacles:
-            if np.linalg.norm(obstacle.velocity) == 0:
-                velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius)
-            else:
+            velocity += self.vfields.obstacle(pos, obstacle.pos, obstacle.radius)
+            if np.linalg.norm(obstacle.velocity) != 0:
                 velocity += self.vfields.moving_obstacle(pos, obstacle.pos, obstacle.radius, obstacle.velocity)
         for other_agent in self.agents:
             if agent is None or agent != other_agent:

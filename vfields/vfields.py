@@ -33,7 +33,6 @@ class VFields(object):
         raise NotImplementedError("VFields child class must implement '_goal'")
 
     def moving_obstacle(self, pos, obstacle_pos, obstacle_radius, obstacle_vel):
-        vel = self.obstacle(pos, obstacle_pos, obstacle_radius)
         u1 = obstacle_vel / np.linalg.norm(obstacle_vel)
         disp = pos - obstacle_pos
         disp1_comp = np.dot(u1, disp)
@@ -44,8 +43,8 @@ class VFields(object):
             relative_disp = np.array([disp1_comp-obstacle_radius, disp2_comp])
             # Use 2*moving_obstacle for a larger margin of error
             relative_vel = self._moving_obstacle(relative_disp, 2*obstacle_radius, np.linalg.norm(obstacle_vel))
-            vel += self.weights[2]*(u1*relative_vel[0] + u2*relative_vel[1])
-        return vel
+            return self.weights[2]*(u1*relative_vel[0] + u2*relative_vel[1])
+        return np.zeros_like(pos)
 
     def _moving_obstacle(self, disp, obstacle_radius, speed):
         raise NotImplementedError("VFields child class must implement '_moving_obstacle'")
@@ -102,6 +101,15 @@ class AnalyticalVFields(VFields):
         side_vel = np.sign(disp[1]) * np.exp(-urgency) * avoid_speed
         return np.array([0, side_vel])
 
+    def _moving_obstacle_list(self, disp, obstacle_radius, speed):
+        # Version that deals with a list/array of displacement values passed
+        velocity = np.zeros(np.shape(disp))
+        for i in range(len(disp)):
+            pass
+            # TODO
+        return velocity
+
+
 
 class NeuralNetVFields(VFields):
     def __init__(self, weights, model_name='Goal-one-obstacle-field-for-all'):
@@ -122,3 +130,7 @@ class NeuralNetVFields(VFields):
     def _goal(self, disp):
         velocity = self.model.forward_goal(torch.tensor(disp).reshape((1, -1)).float()).detach().squeeze().numpy()
         return velocity
+
+    def _moving_obstacle(self, disp, obstacle_radius, speed):
+        # TODO
+        return np.zeros_like(disp)
