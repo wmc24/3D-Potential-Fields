@@ -118,7 +118,7 @@ class AnalyticalVFields(VFields):
 
 
 class NeuralNetVFields(VFields):
-    def __init__(self, weights, model_name='Goal-one-obstacle-field-for-all'):
+    def __init__(self, weights, model_name='Potential-Field'):
         super().__init__(weights)
         #loading the network and its weights
         self.model_name = model_name
@@ -138,7 +138,7 @@ class NeuralNetVFields(VFields):
         return velocity
 
     def _moving_obstacle(self, disp, obstacle_radius, speed):
-        velocity = self.model.forward_goal(torch.tensor(disp).reshape((1, -1)).float(), 
+        side_vel = self.model.forward_goal(torch.tensor(disp).reshape((1, -1)).float(), 
                                            torch.tensor(obstacle_radius).reshape((1, -1)).float(), 
                                            torch.tensor(speed).reshape((1, -1)).float()).detach().squeeze().numpy()
-        return np.zeros_like(disp)
+        return side_vel
