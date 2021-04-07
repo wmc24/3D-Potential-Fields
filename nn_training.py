@@ -311,7 +311,7 @@ if perform_training is True:
                 axs[0].plot(x, gt_velocity[:, 0], label=f'Ground Truth')
                 axs[1].plot(x, velocity[:, 0], label=f'Predicted')
                 axs[1].plot(x, gt_velocity[:, 0], label=f'Ground Truth')
-                plt.xlabel('Displacement')
+                plt.xlabel('Distance')
                 axs[0].set_ylabel('Speed')
                 axs[1].set_ylabel('Speed')
                 axs[0].set_xlim([0, 1000])
