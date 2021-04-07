@@ -58,21 +58,26 @@ class Net(nn.Module):
       self.dims = dims
       self.leaky = True
       self.num_neurons1 = 16
-      self.num_neurons2 = 4
+      self.num_neurons2 = 8
 
       self.goal_linear1 = nn.Linear(1, self.num_neurons1)
       self.goal_linear2 = nn.Linear(self.num_neurons1, self.num_neurons1)
       self.goal_linear3 = nn.Linear(self.num_neurons1, self.num_neurons2)
-      self.goal_linear4 = nn.Linear(self.num_neurons2, self.num_neurons2)
-      self.goal_linear5 = nn.Linear(self.num_neurons2, 1)
-      #self.goal_linear6 = nn.Linear(1, 1, bias=False)
+      self.goal_linear4 = nn.Linear(self.num_neurons2, 1)
 
       self.obstacle_linear1 = nn.Linear(2, self.num_neurons1)
       self.obstacle_linear2 = nn.Linear(self.num_neurons1, self.num_neurons1)
       self.obstacle_linear3 = nn.Linear(self.num_neurons1, self.num_neurons2)
       self.obstacle_linear4 = nn.Linear(self.num_neurons2, self.num_neurons2)
       self.obstacle_linear5 = nn.Linear(self.num_neurons2, 1)
-      self.obstacle_cap = nn.Hardtanh(-1000, 1000)
+
+      self.moving_obstacle_linear1 = nn.Linear(4, self.num_neurons1)
+      self.moving_obstacle_linear2 = nn.Linear(self.num_neurons1, self.num_neurons1)
+      self.moving_obstacle_linear3 = nn.Linear(self.num_neurons1, self.num_neurons1)
+      self.moving_obstacle_linear4 = nn.Linear(self.num_neurons1, self.num_neurons2)
+      self.moving_obstacle_linear5 = nn.Linear(self.num_neurons2, self.num_neurons2)
+      self.moving_obstacle_linear6 = nn.Linear(self.num_neurons2, self.num_neurons2)
+      self.moving_obstacle_linear7 = nn.Linear(self.num_neurons2, 1)
 
       self.whitening_goal_mean = 0
       self.whitening_goal_sigma = 1
@@ -80,30 +85,54 @@ class Net(nn.Module):
       self.whitening_obstacle_sigma = 1
       self.whitening_obstacle_size_mean = 0
       self.whitening_obstacle_size_sigma = 1
+      self.whitening_moving_obstacle_mean = 0
+      self.whitening_moving_obstacle_sigma = 1
+      self.whitening_moving_obstacle_size_mean = 0
+      self.whitening_moving_obstacle_size_sigma = 1
+      self.whitening_moving_obstacle_speed_mean = 0
+      self.whitening_moving_obstacle_speed_sigma = 1
 
       self.whitening = (self.whitening_goal_mean,
                         self.whitening_goal_sigma,
                         self.whitening_obstacle_mean,
                         self.whitening_obstacle_sigma,
                         self.whitening_obstacle_size_mean,
-                        self.whitening_obstacle_size_sigma)
+                        self.whitening_obstacle_size_sigma,
+                        self.whitening_moving_obstacle_mean,
+                        self.whitening_moving_obstacle_sigma,
+                        self.whitening_moving_obstacle_size_mean,
+                        self.whitening_moving_obstacle_size_sigma,
+                        self.whitening_moving_obstacle_speed_mean,
+                        self.whitening_moving_obstacle_speed_sigma)
 
-    def data_whitening(self, goal_disp, planets_dist, planets_radii, spaceships_dist, spaceships_size, meteoroids_dist, meteoroids_size, device):
+    def data_whitening(self, goal_disp, planets_dist, planets_radii, spaceships_dist, spaceships_size, meteoroids_disp, meteoroids_size, meteoroids_speed, device):
       # Computing a data whitening matrix for all the nets to improve training at beginning
       self.whitening_goal_mean, self.whitening_goal_sigma = whitening(torch.norm(goal_disp, dim=1, p=2).reshape((-1, 1)), device)
-      obstacle_dists = torch.cat((planets_dist, spaceships_dist, meteoroids_dist))
+
+      obstacle_dists = torch.cat((planets_dist, spaceships_dist))
       self.whitening_obstacle_mean, self.whitening_obstacle_sigma = whitening(obstacle_dists, device)
-      obstacle_sizes = torch.cat((planets_radii, spaceships_size, meteoroids_size))
+      obstacle_sizes = torch.cat((planets_radii, spaceships_size))
       self.whitening_obstacle_size_mean, self.whitening_obstacle_size_sigma = whitening(obstacle_sizes, device)
+
+      self.whitening_moving_obstacle_mean, self.whitening_moving_obstacle_sigma = whitening(meteoroids_disp, device)
+      self.whitening_moving_obstacle_size_mean, self.whitening_moving_obstacle_size_sigma = whitening(meteoroids_size, device)
+      self.whitening_moving_obstacle_speed_mean, self.whitening_moving_obstacle_speed_sigma = whitening(meteoroids_speed, device)
+
       self.whitening = (self.whitening_goal_mean,
                         self.whitening_goal_sigma,
                         self.whitening_obstacle_mean,
                         self.whitening_obstacle_sigma,
                         self.whitening_obstacle_size_mean,
-                        self.whitening_obstacle_size_sigma)
+                        self.whitening_obstacle_size_sigma,
+                        self.whitening_moving_obstacle_mean,
+                        self.whitening_moving_obstacle_sigma,
+                        self.whitening_moving_obstacle_size_mean,
+                        self.whitening_moving_obstacle_size_sigma,
+                        self.whitening_moving_obstacle_speed_mean,
+                        self.whitening_moving_obstacle_speed_sigma)
     
     def forward_goal(self, goal_disp):
-      # Computing the forward pass for a goal potential only
+      # Computing the forward pass for a goal potential only.
       # It only depends upon the dispance so we get a L2 norm
       # and scale the direction by the output of the network
       # Pass data through first linear layer
@@ -125,8 +154,6 @@ class Net(nn.Module):
       x = self.goal_linear3(x)
       x = F.leaky_relu(x)
       x = self.goal_linear4(x)
-      x = F.leaky_relu(x)
-      x = self.goal_linear5(x)
       if self.leaky is True and self.training is True:
         x = F.leaky_relu(x)
       else:
@@ -135,7 +162,7 @@ class Net(nn.Module):
       return direction * x
 
     def forward_obstacle(self, dist, size):
-      # Computing the forward pass for a single planet potential only
+      # Computing the forward pass for a single object potential only.
       # It only depends upon the distance and radius so we get a L2 norm
       # and scale the direction by the output of the network
 
@@ -158,7 +185,35 @@ class Net(nn.Module):
         x = F.leaky_relu(x)
       else:
         x = F.relu(x)
-      x = self.obstacle_cap(x)
+
+      return x
+
+    def forward_moving_obstacle(self, disp, size, speed):
+      # Computing the forward pass for a single moving object potential only.
+      # It only depends upon the distance and radius so we get a L2 norm
+      # and scale the direction by the output of the network
+
+      # Performing data whitening
+      disp = (disp - self.whitening[6]) / self.whitening[7]
+      size = (size - self.whitening[8]) / self.whitening[9]
+      speed = (size - self.whitening[10]) / self.whitening[11]
+      
+      #x = torch.cat((dist.reshape((-1, 1)) - size.reshape((-1, 1)), size.reshape((-1, 1))), dim=1)
+      x = torch.cat((disp.reshape((-1, 2)), size.reshape((-1, 1)), speed.reshape((-1, 1))), dim=1)
+      x = self.moving_obstacle_linear1(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear2(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear3(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear4(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear5(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear6(x)
+      x = F.leaky_relu(x)
+      x = self.moving_obstacle_linear7(x)
+      x = torch.tanh(x)
 
       return x
     

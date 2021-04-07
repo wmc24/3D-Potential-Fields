@@ -92,7 +92,7 @@ class AnalyticalVFields(VFields):
         return velocity
 
     def _moving_obstacle(self, disp, obstacle_radius, speed):
-        if speed==0: return np.array([0, 0])
+        if speed==0: return np.array(0)
         urgency = 3 * disp[0] / speed
         if abs(disp[1]) < obstacle_radius:
             avoid_speed = 1
@@ -103,10 +103,16 @@ class AnalyticalVFields(VFields):
 
     def _moving_obstacle_list(self, disp, obstacle_radius, speed):
         # Version that deals with a list/array of displacement values passed
-        velocity = np.zeros(np.shape(disp))
+        velocity = np.zeros(np.shape(disp)[0])
         for i in range(len(disp)):
-            pass
-            # TODO
+            if speed!=0:
+                disp_i = disp[i, :]
+                urgency = 3 * disp_i[0] / speed
+                if abs(disp_i[1]) < obstacle_radius:
+                    avoid_speed = 1
+                else:
+                    avoid_speed = np.exp(-(abs(disp_i[1])-obstacle_radius)/self.decay_radius)
+                velocity[i] = np.sign(disp_i[1]) * np.exp(-urgency) * avoid_speed
         return velocity
 
 
@@ -132,5 +138,7 @@ class NeuralNetVFields(VFields):
         return velocity
 
     def _moving_obstacle(self, disp, obstacle_radius, speed):
-        # TODO
+        velocity = self.model.forward_goal(torch.tensor(disp).reshape((1, -1)).float(), 
+                                           torch.tensor(obstacle_radius).reshape((1, -1)).float(), 
+                                           torch.tensor(speed).reshape((1, -1)).float()).detach().squeeze().numpy()
         return np.zeros_like(disp)
