@@ -27,18 +27,18 @@ load_model = True
 loaded_model_name = 'Potential-Field'
 save_model_name = 'Potential-Field'
 tensorboard_name = save_model_name
-tensorboard_logging = True
+tensorboard_logging = False
 perform_training = False
 # Whether or not to train the subnetworks together or seperately
 combined_training = False
 
 # Number of epochs to train for, if None then until keyboard interrupt (ctrl+c)
 # and training parameters
-num_epochs = 51990
+num_epochs = 100000
 learning_rate = 1e-2
 # Decrease the learning rate by a factor of 10
 learning_rate_decrease_epochs = [75000]
-batch_size = 1000 # 250
+batch_size = 250
 # Increase the batch size by a factor of 4
 batch_size_increase_epochs = [30000]
 
@@ -334,7 +334,7 @@ if perform_training is True:
                     axs[j].plot(x, gt_speeds, label=f'Ground Truth, radius = {radius}')
                     axs[j].set_ylabel('Speed')
                     axs[j].set_xlim((0, 1000))
-                    axs[j].legend(loc=4)
+                    axs[j].legend(loc=1)
                     j += 1
                 plt.xlabel('Distance')
                 plot_dir = os.path.join('plots', f'{epoch}_planets_{save_model_name}')
@@ -473,3 +473,22 @@ if perform_training is True:
 
 if perform_training is True and tensorboard_logging is True:
     writer.flush()
+
+
+x = np.linspace(0, size_of_universe/2, 1000).reshape((-1, 1))
+fig, axs = plt.subplots(3, figsize=(10, 10))
+j = 0
+for radius in [40, 100, 200]:
+    radii = torch.ones(np.shape(x)).to(DEVICE).float() * radius
+    speeds = model.forward_obstacle(torch.tensor(x).to(DEVICE).float(), radii).detach().cpu().numpy()
+    gt_speeds = vfields._obstacle_list(x, radius)
+    axs[j].plot(x, speeds, label=f'Predicted, radius = {radius}')
+    axs[j].plot(x, gt_speeds, label=f'Ground Truth, radius = {radius}')
+    axs[j].set_ylabel('Speed')
+    axs[j].set_xlim((0, 1000))
+    axs[j].legend(loc=1)
+    j += 1
+plt.xlabel('Distance')
+plot_dir = os.path.join('plots', f'{10000}_planets_{save_model_name}')
+plt.savefig(plot_dir)
+plt.close()
